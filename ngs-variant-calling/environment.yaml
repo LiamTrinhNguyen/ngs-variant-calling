@@ -1,0 +1,12 @@
+name: ngs-env
+channels:
+  - bioconda
+  - conda-forge
+  - defaults
+dependencies:
+  - sra-tools=3.0.0
+  - fastqc=0.12.1
+  - trimmomatic=0.39
+  - bwa=0.7.17
+  - samtools=1.17
+  - bcftools=1.17
