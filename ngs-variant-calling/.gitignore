@@ -1,13 +1,5 @@
 # Ignore raw data and reference genomes
-data/
-ref/
 
-# Ignore large intermediate analysis files
-*.fastq
-*.fastq.gz
-*.bam
-*.bai
-*.sam
 
 # Ignore system files
 .DS_Store
