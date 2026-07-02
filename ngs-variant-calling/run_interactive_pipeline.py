@@ -1,6 +1,6 @@
 __author__ = 'Liam TrinhNguyen'
 __email__ = 'LiamTrinhNguyen@gmail.com'
-__version__ = 'NGS_Pipeline_v1.4'
+__version__ = 'NGS_Pipeline_v1.5'
 
 import os
 import sys
@@ -59,16 +59,12 @@ class NGSPipeline:
 
         return logger
 
-    def log_summary_info(self):
-        self.logger.info("=" * 60)
-        self.logger.info("PIPELINE SUMMARY")
-        self.logger.info("=" * 60)
-        self.logger.info(f"Run ID          : {self.run_id}")
-        self.logger.info(f"Sample ID       : {self.sample_id}")
-        self.logger.info(f"Reference       : ref/ecoli.fna (E. coli K-12)")
-        self.logger.info(f"Results Path    : {self.results_dir}")
-        self.logger.info(f"Log File        : logs/pipeline_{self.sample_id}_{self.run_id}.log")
-        self.logger.info("=" * 60)
+    def log_step_analysis(self, step_num: int, title: str, analysis: str):
+        self.logger.info("=" * 80)
+        self.logger.info(f"STEP {step_num}: {title.upper()} - DETAILED ANALYSIS")
+        self.logger.info("=" * 80)
+        self.logger.info(analysis.strip())
+        self.logger.info("=" * 80 + "\n")
 
     def clear_screen(self):
         os.system('clear' if os.name == 'posix' else 'cls')
@@ -115,25 +111,35 @@ class NGSPipeline:
         os.makedirs(self._log_dir, exist_ok=True)
         self.logger.info(f"Run directories created for ID: {self.run_id}")
 
+        analysis = """Step 1: Workspace Setup
+Purpose: Create clean, isolated directories for this run.
+Reasoning: Ensures reproducibility and prevents mixing data between different runs.
+Best Practice in Bioinformatics: Organized folder structure is essential for traceability."""
+        self.log_step_analysis(1, "Setup Directories", analysis)
+
     def run_step2(self):
         ref_file = Path('ref/ecoli.fna')
         if ref_file.exists():
             self.logger.info("Reference genome already exists.")
-            return
+        else:
+            self.logger.info("Downloading reference genome...")
+            b64_url = 'aHR0cHM6Ly9mdHAubmNiaS5ubG0ubmloLmdvdi9nZW5vbWVzL2FsbC9HQ0YvMDAwLzAwNS84NDUvR0NGXzAwMDAwNTg0NS4yX0FTTTU4NHYyL0dDRl8wMDAwMDU4NDUuMl9BU001ODR2Ml9nZW5vbWljLmZuYS5neg=='
+            url = base64.b64decode(b64_url).decode('utf-8')
+            urllib.request.urlretrieve(url, 'ref/ecoli.fna.gz')
+            
+            with tqdm(total=100, desc="Unpacking reference", ncols=80, ascii=' -#') as pbar:
+                with gzip.open('ref/ecoli.fna.gz', 'rb') as f_in, open(ref_file, 'wb') as f_out:
+                    shutil.copyfileobj(f_in, f_out)
+                pbar.update(100)
+            
+            Path('ref/ecoli.fna.gz').unlink(missing_ok=True)
+            self.logger.info("Reference genome ready.")
 
-        self.logger.info("Downloading reference genome...")
-        b64_url = 'aHR0cHM6Ly9mdHAubmNiaS5ubG0ubmloLmdvdi9nZW5vbWVzL2FsbC9HQ0YvMDAwLzAwNS84NDUvR0NGXzAwMDAwNTg0NS4yX0FTTTU4NHYyL0dDRl8wMDAwMDU4NDUuMl9BU001ODR2Ml9nZW5vbWljLmZuYS5neg=='
-        url = base64.b64decode(b64_url).decode('utf-8')
-        
-        urllib.request.urlretrieve(url, 'ref/ecoli.fna.gz')
-        
-        with tqdm(total=100, desc="Unpacking reference", ncols=80, ascii=' -#') as pbar:
-            with gzip.open('ref/ecoli.fna.gz', 'rb') as f_in, open(ref_file, 'wb') as f_out:
-                shutil.copyfileobj(f_in, f_out)
-            pbar.update(100)
-        
-        Path('ref/ecoli.fna.gz').unlink(missing_ok=True)
-        self.logger.info("Reference genome ready.")
+        analysis = """Step 2: Reference Genome
+Purpose: Download E. coli K-12 reference genome.
+Biological Context: Acts as the trusted baseline for comparing the sample's sequence.
+Reasoning: All variants are called relative to this reference. Using a standard strain reduces bias."""
+        self.log_step_analysis(2, "Download Reference Genome", analysis)
 
     def run_step3(self):
         self.logger.info("Indexing reference genome...")
@@ -142,6 +148,11 @@ class NGSPipeline:
             pbar.update(1)
             subprocess.run(["samtools", "faidx", "ref/ecoli.fna"], check=True)
             pbar.update(1)
+
+        analysis = """Step 3: Indexing
+Purpose: Build index files for fast alignment.
+Reasoning: Allows BWA and samtools to quickly locate where reads belong in the genome."""
+        self.log_step_analysis(3, "Index Reference", analysis)
 
     def run_step4(self):
         self.logger.info(f"Downloading {self.sample_id} from SRA...")
@@ -152,6 +163,12 @@ class NGSPipeline:
                 "--split-files", "--force"
             ], check=True)
             pbar.update(1)
+
+        analysis = """Step 4: Data Input
+Purpose: Obtain raw sequencing reads.
+Context: Either from public SRA or user-provided local FASTQ files.
+Reasoning: This is the experimental data containing potential mutations."""
+        self.log_step_analysis(4, "Download Reads", analysis)
 
     def run_step5(self):
         qc_dir = self.results_dir / "fastqc"
@@ -166,6 +183,12 @@ class NGSPipeline:
             ], check=True)
             pbar.update(1)
 
+        analysis = """Step 5: FastQC Quality Assessment
+Purpose: Evaluate raw read quality.
+Key Checks: Base quality, GC content, adapters, duplication.
+Reasoning: Identifies problems early before alignment."""
+        self.log_step_analysis(5, "FastQC Quality Check", analysis)
+
     def run_step6(self):
         self.logger.info("Trimming reads...")
         with tqdm(total=1, desc="Trimmomatic", ncols=80, ascii=' -#') as pbar:
@@ -178,6 +201,11 @@ class NGSPipeline:
                 "SLIDINGWINDOW:4:20", "MINLEN:50"
             ], check=True)
             pbar.update(1)
+
+        analysis = """Step 6: Trimmomatic - Read Trimming
+Purpose: Remove low-quality bases and adapters.
+Reasoning: Improves alignment accuracy and reduces false variant calls."""
+        self.log_step_analysis(6, "Trim Reads", analysis)
 
     def run_step7(self):
         self.logger.info("Aligning reads...")
@@ -203,6 +231,11 @@ class NGSPipeline:
 
             Path(str(bam_file).replace(".bam",".temp.bam")).unlink(missing_ok=True)
 
+        analysis = """Step 7: Alignment with BWA-MEM + Samtools
+Purpose: Map reads to reference and create sorted BAM.
+Reasoning: Accurate mapping is foundational for reliable variant detection."""
+        self.log_step_analysis(7, "Align Reads", analysis)
+
     def run_step8(self):
         self.logger.info("Variant calling...")
         bcf_file = self.results_dir / "variants.bcf"
@@ -220,6 +253,11 @@ class NGSPipeline:
             with open(final_vcf, "w") as f:
                 subprocess.run(["bcftools", "view", str(bcf_file)], stdout=f, check=True)
             pbar.update(1)
+
+        analysis = """Step 8: Variant Calling with BCFtools
+Purpose: Identify genomic differences between sample and reference.
+Reasoning: Uses pileup and statistical calling to detect true mutations."""
+        self.log_step_analysis(8, "Call Variants", analysis)
 
     def display_polars_report(self):
         vcf_path = self.results_dir / "final_variants.vcf"
@@ -249,22 +287,17 @@ class NGSPipeline:
         if "POS" in df.columns:
             df = df.with_columns(pl.col("POS").cast(pl.Int64))
 
-        # === Save FULL Polars Table to Log File ===
         self.logger.info("=" * 80)
-        self.logger.info("FULL POLARS MUTATION TABLE")
-        self.logger.info("=" * 80)
+        self.logger.info("FINAL POLARS MUTATION TABLE")
         self.logger.info(f"Total Variants: {df.height}")
+        self.logger.info("=" * 80)
 
-        # Log the entire table as text
         with pl.Config(tbl_rows=-1, tbl_cols=-1, tbl_formatting="ASCII_FULL"):
             table_str = str(df)
-        self.logger.info("\n" + table_str)
+        self.logger.info(table_str)
 
         self.logger.info("=" * 80)
-        self.logger.info("End of Mutation Table")
-        self.logger.info("=" * 80)
 
-        # Console output (short version)
         print("\n" + "="*70)
         print(f" POLARS MUTATION REPORT - Run {self.run_id} (Total Variants: {df.height})")
         print("="*70)
@@ -292,12 +325,9 @@ class NGSPipeline:
         self.logger = self._setup_logger()
         self.logger.info(f"Pipeline started | Run ID: {self.run_id} | Sample: {self.sample_id}")
 
-        self.log_summary_info()
-
         input("\n-> Press ENTER to begin... ")
 
         self.prompt_step(1, "Setup Directories", "...", "...", self.run_step1)
-        
         self.prompt_step(2, "Download Reference Genome", "...", "...", self.run_step2)
         self.prompt_step(3, "Index Reference", "...", "...", self.run_step3)
         self.prompt_step(4, "Download Reads", "...", "...", self.run_step4)
@@ -310,7 +340,7 @@ class NGSPipeline:
         self.print_header("Pipeline Completed Successfully!")
         print(f"\nRun ID: {self.run_id}")
         print(f"Results Location: {self.results_dir}")
-        print(f"Full Log File (including Polars table): logs/pipeline_{self.sample_id}_{self.run_id}.log\n")
+        print(f"Full Detailed Log: logs/pipeline_{self.sample_id}_{self.run_id}.log\n")
 
         self.display_polars_report()
         print("\n🎉 Pipeline finished successfully.\n")
