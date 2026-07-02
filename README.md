@@ -1,27 +1,52 @@
-# NGS Automated Variant Calling Pipeline
+## NGS Automated Variant Calling Pipeline
 
-An interactive Python-based Next-Generation Sequencing (NGS) pipeline for **variant detection** in *Escherichia coli*.
+**An interactive Python-based Next-Generation Sequencing (NGS) pipeline for variant detection in *Escherichia coli*.**
 
-The pipeline supports **two input modes**:
-1. **Public SRA data** (default) – automatically downloads from NCBI SRA.
-2. **Custom local FASTQ files** – you can provide your own paired-end FASTQ files.
+### Input Modes
 
----
+1. **Public SRA Data (Default)**: Automatically fetches paired-end reads from the NCBI Sequence Read Archive (SRA) using `fasterq-dump`.  
+   *(Default sample: SRR1553607)*
 
-## Biological & Analytical Rationale
-
-This pipeline follows standard microbial NGS best practices to transform raw sequencing data into reliable variant calls. It emphasizes quality control, accurate alignment, and statistical variant detection to minimize false positives while maintaining biological relevance.
+2. **Custom Local FASTQ**: Supports user-provided paired-end files (`_1.fastq` and `_2.fastq`) placed in the `data/` directory.
 
 ---
 
-## Prerequisites
+### Biological & Analytical Rationale
 
-- **Conda** or **Mamba**
-- Internet access (required only for public SRA mode)
-- ~2–10 GB of disk space
+This pipeline follows rigorous microbial NGS best practices:
+
+- **Integrated QC & Trimming**: Uses **fastp** for high-performance adapter trimming, quality filtering, and base correction in a single efficient pass.
+- **Statistical Precision**: Employs **BCFtools** for variant calling, combined with an automated **Polars** filtering layer that removes low-confidence calls (DP < 15, QUAL ≤ 30).
+- **Functional Annotation**: Integrates **SnpEff** to predict the biological impact of variants (e.g., missense, synonymous, frameshift, stop-gain).
+- **Resource Management**: Automatic cleanup of large intermediate files (SAM, raw FASTQs) to maintain a minimal storage footprint.
 
 ---
 
+### Prerequisites
+
+- **Environment**: Linux (recommended: GitHub Codespaces or Ubuntu)
+- **Package Manager**: Conda or Mamba
+- **Core Dependencies**:
+  - `fastp`, `bwa`, `samtools`, `bcftools`, `snpEff` (v5.1+)
+  - OpenJDK 11
+  - Python packages: `polars`, `tqdm`
+- **Storage**: Approximately **2–4 GB** of free disk space (optimized pipeline)
+
+---
+
+### Pipeline Steps Overview
+
+| Step | Tool                  | Purpose                                      | Biological Reasoning                                      |
+|------|-----------------------|----------------------------------------------|-----------------------------------------------------------|
+| 1    | Setup                 | Create organized directories                 | Maintains reproducibility and prevents data mixing        |
+| 2    | Reference             | Download *E. coli* K-12 reference genome     | Provides a trusted baseline for accurate comparison       |
+| 3    | Indexing              | Build BWA and samtools indices               | Enables fast and accurate read mapping                    |
+| 4    | Data Input            | Download from SRA or use local FASTQ         | Flexibility for public or private datasets                |
+| 5    | fastp                 | QC, trimming, and base correction            | Removes noise/adapters; generates QC metrics              |
+| 6    | BWA-MEM + Samtools    | Align reads and prepare BAM files            | Accurate mapping to reference genome                      |
+| 7    | BCFtools              | Variant calling                              | Statistical identification of true mutations              |
+| 8    | SnpEff                | Functional annotation                        | Predicts biological impact of variants                    |
+| 9    | Polars                | Data filtering & reporting                   | Extracts high-confidence signals from VCF noise           |
 
 ## Getting Started
 
@@ -40,25 +65,6 @@ This pipeline follows standard microbial NGS best practices to transform raw seq
    ```Bash
    python3 run_interactive_pipeline.py
    ```
-
-
-
-
-
-
-## Pipeline Workflow
-
-| Step | Tool                    | Purpose                                           | Biological Reasoning                                              |
-|------|-------------------------|---------------------------------------------------|-------------------------------------------------------------------|
-| 1    | Setup                   | Create organized directories                      | Maintains reproducibility and clear project structure             |
-| 2    | Reference               | Download *E. coli* K-12 reference genome          | Provides trusted baseline for variant comparison                  |
-| 3    | Indexing                | Build BWA and samtools indices                    | Enables fast and accurate read mapping                            |
-| 4    | Data Input              | Retrieve SRA data or use local FASTQ              | Flexibility for public or private sequencing datasets             |
-| 5    | **fastp**               | Combined QC, trimming, and base correction        | Removes noise/adapters and generates comprehensive QC report      |
-| 6    | BWA-MEM + Samtools      | Align reads and prepare sorted/indexed BAM        | Accurate mapping of reads to reference genome                     |
-| 7    | BCFtools                | Variant calling                                   | Statistical detection of mutations and indels                     |
-| 8    | SnpEff                  | Functional annotation of variants                 | Predicts biological consequences (e.g., missense, stop-gain)     |
-| 9    | Polars + Reporting      | Filtering & final mutation report                 | Extracts high-quality variants and presents clean results        |
 
 
 
