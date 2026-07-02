@@ -1,0 +1,154 @@
+2026-07-02 19:37:27,933 - [NGS_Pipeline.NGSPipeline] - INFO: Pipeline started | Run ID: 20260702_193725 | Sample: SRR1553607
+2026-07-02 19:37:31,334 - [NGS_Pipeline.NGSPipeline] - INFO: Starting Step 1: Setup Directories
+2026-07-02 19:37:31,335 - [NGS_Pipeline.NGSPipeline] - INFO: Run directories created for ID: 20260702_193725
+2026-07-02 19:37:31,335 - [NGS_Pipeline.NGSPipeline] - INFO: ================================================================================
+2026-07-02 19:37:31,335 - [NGS_Pipeline.NGSPipeline] - INFO: STEP 1: SETUP DIRECTORIES - DETAILED ANALYSIS
+2026-07-02 19:37:31,335 - [NGS_Pipeline.NGSPipeline] - INFO: ================================================================================
+2026-07-02 19:37:31,335 - [NGS_Pipeline.NGSPipeline] - INFO: Step 1: Workspace Setup
+Purpose: Create clean, isolated directories for this run.
+Reasoning: Ensures reproducibility and prevents data mixing between runs.
+2026-07-02 19:37:31,335 - [NGS_Pipeline.NGSPipeline] - INFO: ================================================================================
+
+2026-07-02 19:37:31,335 - [NGS_Pipeline.NGSPipeline] - INFO: Step 1 completed successfully.
+2026-07-02 19:37:32,894 - [NGS_Pipeline.NGSPipeline] - INFO: Starting Step 2: Reference Genome Preparation
+2026-07-02 19:37:32,895 - [NGS_Pipeline.NGSPipeline] - INFO: === REFERENCE GENOME PREPARATION STARTED ===
+2026-07-02 19:37:32,896 - [NGS_Pipeline.NGSPipeline] - INFO: Building BWA and samtools indices...
+2026-07-02 19:37:35,167 - [NGS_Pipeline.NGSPipeline] - INFO: Reference Metrics -> Size: 4,641,652 bp | GC Content: 50.79%
+2026-07-02 19:37:35,167 - [NGS_Pipeline.NGSPipeline] - INFO: ================================================================================
+2026-07-02 19:37:35,167 - [NGS_Pipeline.NGSPipeline] - INFO: STEP 2: REFERENCE GENOME PREPARATION - DETAILED ANALYSIS
+2026-07-02 19:37:35,167 - [NGS_Pipeline.NGSPipeline] - INFO: ================================================================================
+2026-07-02 19:37:35,167 - [NGS_Pipeline.NGSPipeline] - INFO: Step 2: Reference Genome Preparation
+1. Downloaded E. coli K-12 reference genome
+2. Unpacked and verified FASTA file
+3. Built BWA and samtools indices
+4. Calculated baseline metrics:
+   - Genome Size: 4,641,652 bp
+   - GC Content: 50.79%
+2026-07-02 19:37:35,168 - [NGS_Pipeline.NGSPipeline] - INFO: ================================================================================
+
+2026-07-02 19:37:35,169 - [NGS_Pipeline.NGSPipeline] - INFO: Step 2 completed successfully.
+2026-07-02 19:37:35,174 - [NGS_Pipeline.NGSPipeline] - INFO: Starting Step 3: Index Reference
+2026-07-02 19:37:35,175 - [NGS_Pipeline.NGSPipeline] - INFO: ================================================================================
+2026-07-02 19:37:35,177 - [NGS_Pipeline.NGSPipeline] - INFO: STEP 3: INDEX REFERENCE - DETAILED ANALYSIS
+2026-07-02 19:37:35,178 - [NGS_Pipeline.NGSPipeline] - INFO: ================================================================================
+2026-07-02 19:37:35,178 - [NGS_Pipeline.NGSPipeline] - INFO: Step 3: Indexing verification completed.
+2026-07-02 19:37:35,179 - [NGS_Pipeline.NGSPipeline] - INFO: ================================================================================
+
+2026-07-02 19:37:35,179 - [NGS_Pipeline.NGSPipeline] - INFO: Step 3 completed successfully.
+2026-07-02 19:37:35,185 - [NGS_Pipeline.NGSPipeline] - INFO: Starting Step 4: Data Input
+2026-07-02 19:37:35,187 - [NGS_Pipeline.NGSPipeline] - INFO: Downloading SRR1553607 from SRA...
+2026-07-02 19:37:39,414 - [NGS_Pipeline.NGSPipeline] - INFO: Loaded 203,445 paired-end reads.
+2026-07-02 19:37:39,414 - [NGS_Pipeline.NGSPipeline] - INFO: ================================================================================
+2026-07-02 19:37:39,414 - [NGS_Pipeline.NGSPipeline] - INFO: STEP 4: DATA INPUT - DETAILED ANALYSIS
+2026-07-02 19:37:39,415 - [NGS_Pipeline.NGSPipeline] - INFO: ================================================================================
+2026-07-02 19:37:39,415 - [NGS_Pipeline.NGSPipeline] - INFO: Step 4: Data Input
+Loaded raw sequencing data for sample SRR1553607
+Total reads: 203,445
+2026-07-02 19:37:39,415 - [NGS_Pipeline.NGSPipeline] - INFO: ================================================================================
+
+2026-07-02 19:37:39,415 - [NGS_Pipeline.NGSPipeline] - INFO: Step 4 completed successfully.
+2026-07-02 19:37:39,419 - [NGS_Pipeline.NGSPipeline] - INFO: Starting Step 5: FastQC Quality Check
+2026-07-02 19:37:39,420 - [NGS_Pipeline.NGSPipeline] - INFO: Running FastQC...
+2026-07-02 19:37:48,404 - [NGS_Pipeline.NGSPipeline] - INFO: ================================================================================
+2026-07-02 19:37:48,404 - [NGS_Pipeline.NGSPipeline] - INFO: STEP 5: FASTQC QUALITY CHECK - DETAILED ANALYSIS
+2026-07-02 19:37:48,404 - [NGS_Pipeline.NGSPipeline] - INFO: ================================================================================
+2026-07-02 19:37:48,404 - [NGS_Pipeline.NGSPipeline] - INFO: Step 5: FastQC Quality Assessment
+Performed quality control on raw reads
+Generated detailed HTML reports
+2026-07-02 19:37:48,404 - [NGS_Pipeline.NGSPipeline] - INFO: ================================================================================
+
+2026-07-02 19:37:48,405 - [NGS_Pipeline.NGSPipeline] - INFO: Step 5 completed successfully.
+2026-07-02 19:37:48,410 - [NGS_Pipeline.NGSPipeline] - INFO: Starting Step 6: Contamination Profiling
+2026-07-02 19:37:48,410 - [NGS_Pipeline.NGSPipeline] - INFO: Running Kraken2 for contamination profiling...
+2026-07-02 19:37:48,410 - [NGS_Pipeline.NGSPipeline] - WARNING: Kraken2 DB not found. Skipping contamination check.
+2026-07-02 19:37:48,410 - [NGS_Pipeline.NGSPipeline] - INFO: ================================================================================
+2026-07-02 19:37:48,410 - [NGS_Pipeline.NGSPipeline] - INFO: STEP 6: CONTAMINATION CHECK - DETAILED ANALYSIS
+2026-07-02 19:37:48,410 - [NGS_Pipeline.NGSPipeline] - INFO: ================================================================================
+2026-07-02 19:37:48,410 - [NGS_Pipeline.NGSPipeline] - INFO: Step 6: Contamination Profiling (Skipped)
+Kraken2 DB not found in ref/kraken2_db.
+2026-07-02 19:37:48,410 - [NGS_Pipeline.NGSPipeline] - INFO: ================================================================================
+
+2026-07-02 19:37:48,411 - [NGS_Pipeline.NGSPipeline] - INFO: Step 6 completed successfully.
+2026-07-02 19:37:48,415 - [NGS_Pipeline.NGSPipeline] - INFO: Starting Step 7: Trim Reads
+2026-07-02 19:37:48,415 - [NGS_Pipeline.NGSPipeline] - INFO: Trimming reads...
+2026-07-02 19:37:50,571 - [NGS_Pipeline.NGSPipeline] - INFO: ================================================================================
+2026-07-02 19:37:50,572 - [NGS_Pipeline.NGSPipeline] - INFO: STEP 7: TRIM READS - DETAILED ANALYSIS
+2026-07-02 19:37:50,572 - [NGS_Pipeline.NGSPipeline] - INFO: ================================================================================
+2026-07-02 19:37:50,572 - [NGS_Pipeline.NGSPipeline] - INFO: Step 7: Read Trimming
+Removed low-quality bases and adapters
+2026-07-02 19:37:50,572 - [NGS_Pipeline.NGSPipeline] - INFO: ================================================================================
+
+2026-07-02 19:37:50,573 - [NGS_Pipeline.NGSPipeline] - INFO: Step 7 completed successfully.
+2026-07-02 19:37:50,579 - [NGS_Pipeline.NGSPipeline] - INFO: Starting Step 8: Align Reads
+2026-07-02 19:37:50,579 - [NGS_Pipeline.NGSPipeline] - INFO: Aligning reads...
+2026-07-02 19:38:09,395 - [NGS_Pipeline.NGSPipeline] - INFO: ================================================================================
+2026-07-02 19:38:09,396 - [NGS_Pipeline.NGSPipeline] - INFO: STEP 8: ALIGN READS - DETAILED ANALYSIS
+2026-07-02 19:38:09,396 - [NGS_Pipeline.NGSPipeline] - INFO: ================================================================================
+2026-07-02 19:38:09,397 - [NGS_Pipeline.NGSPipeline] - INFO: Step 8: Alignment
+Mapped reads to reference genome using BWA-MEM
+Created sorted and indexed BAM file
+ALIGNMENT RATE: 2.01%
+2026-07-02 19:38:09,397 - [NGS_Pipeline.NGSPipeline] - INFO: ================================================================================
+
+2026-07-02 19:38:09,397 - [NGS_Pipeline.NGSPipeline] - ERROR: CRITICAL: Alignment rate is only 2.01%. Expect artifacts downstream.
+2026-07-02 19:38:09,397 - [NGS_Pipeline.NGSPipeline] - INFO: Step 8 completed successfully.
+2026-07-02 19:38:09,401 - [NGS_Pipeline.NGSPipeline] - INFO: Starting Step 9: Call Variants
+2026-07-02 19:38:09,401 - [NGS_Pipeline.NGSPipeline] - INFO: Variant calling...
+2026-07-02 19:38:09,891 - [NGS_Pipeline.NGSPipeline] - INFO: ================================================================================
+2026-07-02 19:38:09,891 - [NGS_Pipeline.NGSPipeline] - INFO: STEP 9: CALL VARIANTS - DETAILED ANALYSIS
+2026-07-02 19:38:09,891 - [NGS_Pipeline.NGSPipeline] - INFO: ================================================================================
+2026-07-02 19:38:09,891 - [NGS_Pipeline.NGSPipeline] - INFO: Step 9: Variant Calling
+Total variants detected: 536
+2026-07-02 19:38:09,891 - [NGS_Pipeline.NGSPipeline] - INFO: ================================================================================
+
+2026-07-02 19:38:09,892 - [NGS_Pipeline.NGSPipeline] - INFO: Step 9 completed successfully.
+2026-07-02 19:38:09,897 - [NGS_Pipeline.NGSPipeline] - INFO: Starting Step 10: Annotate Variants
+2026-07-02 19:38:09,897 - [NGS_Pipeline.NGSPipeline] - INFO: Annotating variants with SnpEff...
+2026-07-02 19:38:10,207 - [NGS_Pipeline.NGSPipeline] - WARNING: SnpEff annotation failed: Command '['snpEff', '-Xmx4g', 'eff', 'Escherichia_coli_str_k_12_substr_mg1655', 'results/run_20260702_193725/final_variants.vcf']' returned non-zero exit status 1.
+2026-07-02 19:38:10,208 - [NGS_Pipeline.NGSPipeline] - INFO: ================================================================================
+2026-07-02 19:38:10,208 - [NGS_Pipeline.NGSPipeline] - INFO: STEP 10: VARIANT ANNOTATION - DETAILED ANALYSIS
+2026-07-02 19:38:10,208 - [NGS_Pipeline.NGSPipeline] - INFO: ================================================================================
+2026-07-02 19:38:10,208 - [NGS_Pipeline.NGSPipeline] - INFO: Step 10: Variant Annotation (Failed)
+Error: Command '['snpEff', '-Xmx4g', 'eff', 'Escherichia_coli_str_k_12_substr_mg1655', 'results/run_20260702_193725/final_variants.vcf']' returned non-zero exit status 1.
+2026-07-02 19:38:10,209 - [NGS_Pipeline.NGSPipeline] - INFO: ================================================================================
+
+2026-07-02 19:38:10,209 - [NGS_Pipeline.NGSPipeline] - INFO: Step 10 completed successfully.
+2026-07-02 19:38:10,213 - [NGS_Pipeline.NGSPipeline] - WARNING: Annotated VCF missing or empty. Falling back to raw VCF.
+2026-07-02 19:38:10,227 - [NGS_Pipeline.NGSPipeline] - INFO: ==========================================================================================
+2026-07-02 19:38:10,227 - [NGS_Pipeline.NGSPipeline] - INFO: FINAL POLARS MUTATION TABLE (FILTERED)
+2026-07-02 19:38:10,228 - [NGS_Pipeline.NGSPipeline] - INFO: Raw Variants: 536 | High-Quality Variants: 14
+2026-07-02 19:38:10,228 - [NGS_Pipeline.NGSPipeline] - INFO: ==========================================================================================
+2026-07-02 19:38:10,229 - [NGS_Pipeline.NGSPipeline] - INFO: shape: (14, 10)
++-------------+---------+-----+-----+---------+--------+-----------------------------------+----------+-----------------+--------+
+| CHROM       | POS     | REF | ALT | QUAL    | FILTER | data/run_20260702_193725/sorte... | Depth_DP | Allele_Count_AC | Effect |
+| ---         | ---     | --- | --- | ---     | ---    | ---                               | ---      | ---             | ---    |
+| str         | i64     | str | str | f64     | str    | str                               | i32      | i32             | str    |
++================================================================================================================================+
+| NC_000913.3 | 224781  | C   | T   | 222.18  | .      | 0/1:255,0,205                     | 42       | 1               | null   |
+|-------------+---------+-----+-----+---------+--------+-----------------------------------+----------+-----------------+--------|
+| NC_000913.3 | 224788  | G   | A   | 222.279 | .      | 0/1:255,0,238                     | 44       | 1               | null   |
+|-------------+---------+-----+-----+---------+--------+-----------------------------------+----------+-----------------+--------|
+| NC_000913.3 | 224851  | A   | G   | 44.4146 | .      | 1/1:74,54,0                       | 21       | 2               | null   |
+|-------------+---------+-----+-----+---------+--------+-----------------------------------+----------+-----------------+--------|
+| NC_000913.3 | 224885  | T   | C   | 138.98  | .      | 0/1:173,0,28                      | 21       | 1               | null   |
+|-------------+---------+-----+-----+---------+--------+-----------------------------------+----------+-----------------+--------|
+| NC_000913.3 | 227022  | A   | G   | 70.4148 | .      | 1/1:100,57,0                      | 28       | 2               | null   |
+|-------------+---------+-----+-----+---------+--------+-----------------------------------+----------+-----------------+--------|
+| NC_000913.3 | 4038709 | G   | A   | 69.2815 | .      | 0/1:102,0,83                      | 32       | 1               | null   |
+|-------------+---------+-----+-----+---------+--------+-----------------------------------+----------+-----------------+--------|
+| NC_000913.3 | 4038736 | T   | G   | 124.055 | .      | 1/1:151,7,0                       | 23       | 2               | null   |
+|-------------+---------+-----+-----+---------+--------+-----------------------------------+----------+-----------------+--------|
+| NC_000913.3 | 4038738 | C   | T   | 136.222 | .      | 1/1:163,18,0                      | 19       | 2               | null   |
+|-------------+---------+-----+-----+---------+--------+-----------------------------------+----------+-----------------+--------|
+| NC_000913.3 | 4038744 | G   | A   | 136.227 | .      | 1/1:163,16,0                      | 19       | 2               | null   |
+|-------------+---------+-----+-----+---------+--------+-----------------------------------+----------+-----------------+--------|
+| NC_000913.3 | 4038747 | A   | C   | 127.146 | .      | 1/1:154,7,0                       | 20       | 2               | null   |
+|-------------+---------+-----+-----+---------+--------+-----------------------------------+----------+-----------------+--------|
+| NC_000913.3 | 4038781 | A   | G   | 72.3387 | .      | 1/1:99,56,0                       | 31       | 2               | null   |
+|-------------+---------+-----+-----+---------+--------+-----------------------------------+----------+-----------------+--------|
+| NC_000913.3 | 4038786 | A   | G   | 59.8375 | .      | 1/1:87,13,0                       | 28       | 2               | null   |
+|-------------+---------+-----+-----+---------+--------+-----------------------------------+----------+-----------------+--------|
+| NC_000913.3 | 4038789 | A   | T   | 44.5954 | .      | 1/1:72,4,0                        | 27       | 2               | null   |
+|-------------+---------+-----+-----+---------+--------+-----------------------------------+----------+-----------------+--------|
+| NC_000913.3 | 4038795 | C   | G   | 66.2115 | .      | 1/1:93,18,0                       | 17       | 2               | null   |
++-------------+---------+-----+-----+---------+--------+-----------------------------------+----------+-----------------+--------+
