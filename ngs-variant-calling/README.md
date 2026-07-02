@@ -18,9 +18,10 @@ This pipeline follows standard microbial NGS best practices to transform raw seq
 
 - **Conda** or **Mamba**
 - Internet access (required only for public SRA mode)
-- Sufficient disk space (~2–10 GB)
+- ~2–10 GB of disk space
 
 ---
+
 
 ## Getting Started
 
@@ -28,13 +29,19 @@ This pipeline follows standard microbial NGS best practices to transform raw seq
    ```bash
    git clone https://github.com/yourusername/ngs-variant-calling.git
    cd ngs-variant-calling
+   ```
+2. **Create and activate the environment**
+   ```Bash
+   conda env create -f environment.yml
+   conda activate ngs-env
+   ```
+   
+3. **Run the pipeline**
+   ```Bash
+   python3 run_interactive_pipeline.py
+   ```
 
-Create and activate the environmentBashconda env create -f environment.yml
-conda activate ngs-env
-Run the pipelineBashpython3 run_interactive_pipeline.py
 
-
-Pipeline Workflow
 
 
 
@@ -56,42 +63,37 @@ Pipeline Workflow
 
 
 
-Input Options
+## Input Options
 1. Public SRA Data (Default)
-
 The pipeline automatically downloads paired-end FASTQ files using fasterq-dump.
 Default sample: SRR1553607
-
 2. Custom Local FASTQ Files
 
 Place your paired-end FASTQ files (.fastq or .fastq.gz) in the data/ folder (or any accessible location).
 When prompted, select Option 2 and enter the base name of your files (without _1 / _2 and extensions).
 
 Example:
+Files: my_sample_1.fastq.gz and my_sample_2.fastq.gz → Enter: my_sample
 
-Files: my_sample_1.fastq.gz and my_sample_2.fastq.gz
-Enter: my_sample
-
-
-Outputs
+## Outputs
 Each run creates a timestamped folder under results/run_YYYYMMDD_HHMMSS/ to prevent overwriting previous results:
 
 final_variants.vcf – List of detected mutations
 FastQC quality reports
 Sorted & indexed BAM file
-Detailed log file containing the full Polars mutation table
+Detailed log file (including the full Polars mutation table)
 
 
-Features
+## Features
 
-Only Step 1 requires manual input; remaining steps run automatically
+Only Step 1 requires manual confirmation; remaining steps run automatically
 Real-time progress bars (tqdm)
 Timestamped run directories (safe for repeated runs)
 Comprehensive logging with complete mutation table
 Support for both public SRA and custom local FASTQ inputs
 
 
-Tools Used
+## Tools Used
 
 Data Retrieval: SRA-Tools (fasterq-dump)
 Quality Control: FastQC
@@ -101,7 +103,7 @@ Variant Calling: BCFtools
 Reporting: Polars + tqdm
 
 
-Author
+## Author
 Liam TrinhNguyen
 APHL-CDC Public Health Laboratory Fellow / Data Scientist
 Wisconsin State Laboratory of Hygiene
