@@ -78,27 +78,27 @@ This pipeline follows standard microbial NGS best practices to transform raw seq
    Files: my_sample_1.fastq.gz and my_sample_2.fastq.gz -> Enter: my_sample
 
 ## Outputs
-   Each run creates a timestamped folder under results/run_YYYYMMDD_HHMMSS/:
-   final_variants.vcf – Raw detected mutations.
-   annotated_variants.vcf – Functional impact predictions (via SnpEff).
-   fastp.html/json – Comprehensive quality and adapter content reports.
-   alignment_stats.txt – Alignment mapping rates for data validation.
-   pipeline_*.log – Full audit trail including the final filtered mutation table.
+Each run creates a timestamped folder under results/run_YYYYMMDD_HHMMSS/:
+   - final_variants.vcf – Raw detected mutations.
+   - annotated_variants.vcf – Functional impact predictions (via SnpEff).
+   - fastp.html/json – Comprehensive quality and adapter content reports.
+   - alignment_stats.txt – Alignment mapping rates for data validation.
+   - pipeline_*.log – Full audit trail including the final filtered mutation table.
 
 ## Features
-   Automated Validation: Step 8 logs the alignment rate and warns if coverage is insufficient.
-   Data Decomposition: Uses polars to extract Depth (DP), Allele Count (AC), and Effect into a clean, filterable table.
-   Production-Ready: Includes error handling, auto-cleanup of intermediate SAM/FASTQ files, and Java memory allocation (-Xmx4g) for annotation.
-   Interactive Dashboard: Single-step initial confirmation followed by fully automated execution.
+   - Automated Validation: Step 8 logs the alignment rate and warns if coverage is insufficient.
+   - Data Decomposition: Uses polars to extract Depth (DP), Allele Count (AC), and Effect into a clean, filterable table.
+   - Production-Ready: Includes error handling, auto-cleanup of intermediate SAM/FASTQ files, and Java memory allocation (-Xmx4g) for annotation.
+   - Interactive Dashboard: Single-step initial confirmation followed by fully automated execution.
 
 ## Tools Used
-   Data Retrieval: SRA-Tools (fasterq-dump)
-   QC & Trimming: fastp
-   Contamination Check: Kraken2
-   Alignment: BWA-MEM + Samtools
-   Variant Calling: BCFtools
-   Annotation: SnpEff
-   Data Processing: Polars + tqdm
+   - Data Retrieval: SRA-Tools (fasterq-dump)
+   - QC & Trimming: fastp
+   - Contamination Check: Kraken2
+   - Alignment: BWA-MEM + Samtools
+   - Variant Calling: BCFtools
+   - Annotation: SnpEff
+   - Data Processing: Polars + tqdm
 
 ## Author
 Liam TrinhNguyen
