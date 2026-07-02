@@ -74,7 +74,7 @@ Place your paired-end FASTQ files (.fastq or .fastq.gz) in the data/ folder (or 
 When prompted, select Option 2 and enter the base name of your files (without _1 / _2 and extensions).
 
 Example:
-Files: my_sample_1.fastq.gz and my_sample_2.fastq.gz → Enter: my_sample
+Files: my_sample_1.fastq.gz and my_sample_2.fastq.gz -> Enter: my_sample
 
 ## Outputs
    Each run creates a timestamped folder under results/run_YYYYMMDD_HHMMSS/ to prevent overwriting previous results:
