@@ -1,6 +1,6 @@
 __author__ = 'Liam TrinhNguyen'
 __email__ = 'LiamTrinhNguyen@gmail.com'
-__version__ = 'NGS_Pipeline_v1.8'
+__version__ = 'NGS_Pipeline_v1.9'
 
 import os
 import sys
@@ -10,7 +10,6 @@ import base64
 import logging
 import urllib.request
 import subprocess
-import re
 from datetime import datetime
 from pathlib import Path
 import polars as pl
@@ -21,7 +20,7 @@ try:
 except ImportError:
     print("Installing tqdm...")
     subprocess.check_call([sys.executable, "-m", "pip", "install", "tqdm"])
-    from tqdm import tqdm
+    from tqdm import tqdm)
 
 
 class NGSPipeline:
@@ -128,18 +127,15 @@ Reasoning: Ensures reproducibility and prevents data mixing between runs."""
             b64_url = 'aHR0cHM6Ly9mdHAubmNiaS5ubG0ubmloLmdvdi9nZW5vbWVzL2FsbC9HQ0YvMDAwLzAwNS84NDUvR0NGXzAwMDAwNTg0NS4yX0FTTTU4NHYyL0dDRl8wMDAwMDU4NDUuMl9BU001ODR2Ml9nZW5vbWljLmZuYS5neg=='
             url = base64.b64decode(b64_url).decode('utf-8')
             urllib.request.urlretrieve(url, ref_gz)
-            self.logger.info("Download completed.")
 
-        if ref_gz.exists():
-            self.logger.info("Unpacking FASTA file...")
-            with tqdm(total=100, desc="Unpacking", ncols=80, ascii=' -#') as pbar:
+            with tqdm(total=100, desc="Unpacking reference", ncols=80, ascii=' -#') as pbar:
                 with gzip.open(ref_gz, 'rb') as f_in, open(ref_fasta, 'wb') as f_out:
                     shutil.copyfileobj(f_in, f_out)
                 pbar.update(100)
             ref_gz.unlink(missing_ok=True)
             self.logger.info("FASTA file unpacked and verified.")
 
-        self.logger.info("Building indices...")
+        self.logger.info("Building BWA and samtools indices...")
         with tqdm(total=2, desc="Indexing", ncols=80, ascii=' -#') as pbar:
             subprocess.run(["bwa", "index", str(ref_fasta)], check=True)
             pbar.update(1)
@@ -153,14 +149,17 @@ Reasoning: Ensures reproducibility and prevents data mixing between runs."""
                 seq = ''.join(line.strip() for line in f if not line.startswith('>'))
             genome_size = len(seq)
             gc_content = round((seq.count('G') + seq.count('C')) / genome_size * 100, 2) if genome_size > 0 else 0
-            self.logger.info(f"Reference Metrics → Size: {genome_size:,} bp | GC Content: {gc_content}%")
+            self.logger.info(f"Reference Metrics -> Size: {genome_size:,} bp | GC Content: {gc_content}%")
         except:
             pass
 
         analysis = f"""Step 2: Reference Genome Preparation
-• Downloaded and unpacked E. coli K-12 genome
-• Built BWA & samtools indices
-• Calculated metrics: {genome_size:,} bp, GC {gc_content}%"""
+1. Downloaded E. coli K-12 reference genome
+2. Unpacked and verified FASTA file
+3. Built BWA and samtools indices
+4. Calculated baseline metrics:
+   - Genome Size: {genome_size:,} bp
+   - GC Content: {gc_content}%"""
         self.log_step_analysis(2, "Reference Genome Preparation", analysis)
 
     def run_step3(self):
@@ -189,8 +188,8 @@ Reasoning: Ensures reproducibility and prevents data mixing between runs."""
             pass
 
         analysis = f"""Step 4: Data Input
-• Acquired raw sequencing reads for sample {self.sample_id}
-• Total reads: {total_reads:,}"""
+Loaded raw sequencing data for sample {self.sample_id}
+Total reads: {total_reads:,}"""
         self.log_step_analysis(4, "Data Input", analysis)
 
     def run_step5(self):
@@ -207,28 +206,25 @@ Reasoning: Ensures reproducibility and prevents data mixing between runs."""
             pbar.update(1)
 
         analysis = """Step 5: FastQC Quality Assessment
-• Performed quality control on raw reads
-• Generated detailed HTML reports"""
+Performed quality control on raw reads
+Generated detailed HTML reports"""
         self.log_step_analysis(5, "FastQC Quality Check", analysis)
 
     def run_step6(self):
         self.logger.info("Trimming reads...")
-        result = subprocess.run([
-            "trimmomatic", "PE", "-phred33",
-            f"{self.data_dir}/{self.sample_id}_1.fastq",
-            f"{self.data_dir}/{self.sample_id}_2.fastq",
-            f"{self.data_dir}/trimmed_1.fastq", f"{self.data_dir}/unpaired_1.fastq",
-            f"{self.data_dir}/trimmed_2.fastq", f"{self.data_dir}/unpaired_2.fastq",
-            "SLIDINGWINDOW:4:20", "MINLEN:50"
-        ], capture_output=True, text=True)
+        with tqdm(total=1, desc="Trimmomatic", ncols=80, ascii=' -#') as pbar:
+            subprocess.run([
+                "trimmomatic", "PE", "-phred33",
+                f"{self.data_dir}/{self.sample_id}_1.fastq",
+                f"{self.data_dir}/{self.sample_id}_2.fastq",
+                f"{self.data_dir}/trimmed_1.fastq", f"{self.data_dir}/unpaired_1.fastq",
+                f"{self.data_dir}/trimmed_2.fastq", f"{self.data_dir}/unpaired_2.fastq",
+                "SLIDINGWINDOW:4:20", "MINLEN:50"
+            ], check=True)
+            pbar.update(1)
 
-        trimmed_info = "Trimming completed."
-        if result.stderr:
-            trimmed_info = result.stderr.splitlines()[-1] if result.stderr else "Trimming completed."
-
-        analysis = f"""Step 6: Read Trimming (Trimmomatic)
-• Removed low-quality bases and adapters
-• Summary: {trimmed_info}"""
+        analysis = """Step 6: Read Trimming
+Removed low-quality bases and adapters"""
         self.log_step_analysis(6, "Trim Reads", analysis)
 
     def run_step7(self):
@@ -255,7 +251,6 @@ Reasoning: Ensures reproducibility and prevents data mixing between runs."""
 
             Path(str(bam_file).replace(".bam",".temp.bam")).unlink(missing_ok=True)
 
-        # Get real alignment stats
         alignment_rate = "N/A"
         try:
             result = subprocess.run(["samtools", "flagstat", str(bam_file)], capture_output=True, text=True)
@@ -267,9 +262,9 @@ Reasoning: Ensures reproducibility and prevents data mixing between runs."""
             pass
 
         analysis = f"""Step 7: Alignment
-• Mapped reads to reference genome using BWA-MEM
-• Alignment rate: {alignment_rate}
-• Created sorted and indexed BAM file"""
+Mapped reads to reference genome
+Alignment rate: {alignment_rate}
+Created sorted and indexed BAM file"""
         self.log_step_analysis(7, "Align Reads", analysis)
 
     def run_step8(self):
@@ -298,12 +293,43 @@ Reasoning: Ensures reproducibility and prevents data mixing between runs."""
             pass
 
         analysis = f"""Step 8: Variant Calling
-• Called variants using BCFtools
-• Total variants detected: {variant_count}"""
+Total variants detected: {variant_count}"""
         self.log_step_analysis(8, "Call Variants", analysis)
 
+    def run_step9(self):
+        """Step 9: Variant Annotation with SnpEff"""
+        self.logger.info("Annotating variants with SnpEff...")
+        input_vcf = self.results_dir / "final_variants.vcf"
+        annotated_vcf = self.results_dir / "annotated_variants.vcf"
+
+        snpeff_db = "Escherichia_coli_str_k_12_substr_mg1655"
+
+        with tqdm(total=2, desc="SnpEff Annotation", ncols=80, ascii=' -#') as pbar:
+            # Download database if needed
+            subprocess.run(
+                ["snpEff", "download", snpeff_db],
+                check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+            )
+            pbar.update(1)
+
+            # Run annotation
+            with open(annotated_vcf, "w") as f:
+                subprocess.run(
+                    ["snpEff", "eff", snpeff_db, str(input_vcf)],
+                    stdout=f, check=True, stderr=subprocess.DEVNULL
+                )
+            pbar.update(1)
+
+        analysis = f"""Step 9: Variant Annotation (SnpEff)
+Annotated variants using database: {snpeff_db}
+Added biological impact predictions (e.g., missense, frameshift)"""
+        self.log_step_analysis(9, "Variant Annotation", analysis)
+
     def display_polars_report(self):
-        vcf_path = self.results_dir / "final_variants.vcf"
+        vcf_path = self.results_dir / "annotated_variants.vcf"
+        if not vcf_path.exists():
+            vcf_path = self.results_dir / "final_variants.vcf"
+
         if not vcf_path.exists():
             self.logger.warning("No variants file found.")
             print("-> No variants file found.")
@@ -327,26 +353,34 @@ Reasoning: Ensures reproducibility and prevents data mixing between runs."""
             return
 
         df = pl.DataFrame(data_rows, schema=columns)
-        if "POS" in df.columns:
-            df = df.with_columns(pl.col("POS").cast(pl.Int64))
+
+        # Decompose INFO column
+        df = df.with_columns([
+            pl.col("POS").cast(pl.Int64),
+            pl.col("QUAL").cast(pl.Float64, strict=False),
+            pl.col("INFO").str.extract(r"DP=(\d+)").cast(pl.Int32).alias("Depth_DP"),
+            pl.col("INFO").str.extract(r"AC=(\d+)").cast(pl.Int32).alias("Allele_Count_AC"),
+            pl.col("INFO").str.extract(r"ANN=[^|]*\|([^|]+)\|").alias("Effect")
+        ])
+
+        # Drop monolithic columns
+        df = df.drop(["INFO", "FORMAT", "SAMPLE", "ID"])
+
+        # Filter for high-quality calls
+        clean_df = df.filter((pl.col("Depth_DP") >= 15) & (pl.col("QUAL") > 30.0))
 
         self.logger.info("=" * 90)
-        self.logger.info("FINAL POLARS MUTATION TABLE")
-        self.logger.info(f"Total Variants: {df.height}")
+        self.logger.info("FINAL POLARS MUTATION TABLE (FILTERED)")
+        self.logger.info(f"Raw Variants: {df.height} | High-Quality Variants: {clean_df.height}")
         self.logger.info("=" * 90)
 
         with pl.Config(tbl_rows=-1, tbl_cols=-1, tbl_formatting="ASCII_FULL"):
-            self.logger.info(str(df))
-
-        self.logger.info("=" * 90)
+            self.logger.info(str(clean_df))
 
         print("\n" + "="*70)
-        print(f" POLARS MUTATION REPORT - Run {self.run_id} (Total Variants: {df.height})")
+        print(f" POLARS MUTATION REPORT - High Quality Calls: {clean_df.height}")
         print("="*70)
-
-        display_cols = [c for c in ["CHROM", "POS", "REF", "ALT", "QUAL", "FILTER"] if c in df.columns]
-        with pl.Config(tbl_rows=-1, tbl_cols=-1):
-            print(df.select(display_cols))
+        print(clean_df)
 
     def run_pipeline(self):
         self.clear_screen()
@@ -377,6 +411,7 @@ Reasoning: Ensures reproducibility and prevents data mixing between runs."""
         self.prompt_step(6, "Trim Reads", "...", "...", self.run_step6)
         self.prompt_step(7, "Align Reads", "...", "...", self.run_step7)
         self.prompt_step(8, "Call Variants", "...", "...", self.run_step8)
+        self.prompt_step(9, "Annotate Variants", "...", "...", self.run_step9)
 
         self.clear_screen()
         self.print_header("Pipeline Completed Successfully!")
@@ -385,7 +420,7 @@ Reasoning: Ensures reproducibility and prevents data mixing between runs."""
         print(f"Full Detailed Log: logs/pipeline_{self.sample_id}_{self.run_id}.log\n")
 
         self.display_polars_report()
-        print("\n🎉 Pipeline finished successfully.\n")
+        print("\nPipeline finished successfully.\n")
 
 
 if __name__ == "__main__":
