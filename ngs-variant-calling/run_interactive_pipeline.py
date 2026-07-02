@@ -1,6 +1,6 @@
 __author__ = 'Liam TrinhNguyen'
 __email__ = 'LiamTrinhNguyen@gmail.com'
-__version__ = 'NGS_Pipeline_v1.5'
+__version__ = 'NGS_Pipeline_v1.6'
 
 import os
 import sys
@@ -60,6 +60,7 @@ class NGSPipeline:
         return logger
 
     def log_step_analysis(self, step_num: int, title: str, analysis: str):
+        """Save detailed analysis to log file"""
         self.logger.info("=" * 80)
         self.logger.info(f"STEP {step_num}: {title.upper()} - DETAILED ANALYSIS")
         self.logger.info("=" * 80)
@@ -112,9 +113,9 @@ class NGSPipeline:
         self.logger.info(f"Run directories created for ID: {self.run_id}")
 
         analysis = """Step 1: Workspace Setup
-Purpose: Create clean, isolated directories for this run.
-Reasoning: Ensures reproducibility and prevents mixing data between different runs.
-Best Practice in Bioinformatics: Organized folder structure is essential for traceability."""
+Purpose: Create clean, isolated directories for this specific run.
+Reasoning: Ensures full reproducibility and prevents data contamination between runs.
+Best Practice: Standard in professional bioinformatics workflows."""
         self.log_step_analysis(1, "Setup Directories", analysis)
 
     def run_step2(self):
@@ -135,10 +136,10 @@ Best Practice in Bioinformatics: Organized folder structure is essential for tra
             Path('ref/ecoli.fna.gz').unlink(missing_ok=True)
             self.logger.info("Reference genome ready.")
 
-        analysis = """Step 2: Reference Genome
-Purpose: Download E. coli K-12 reference genome.
-Biological Context: Acts as the trusted baseline for comparing the sample's sequence.
-Reasoning: All variants are called relative to this reference. Using a standard strain reduces bias."""
+        analysis = """Step 2: Reference Genome Download
+Purpose: Obtain high-quality E. coli K-12 reference genome.
+Biological Context: Serves as the trusted standard for variant comparison.
+Reasoning: All detected mutations are relative to this reference strain."""
         self.log_step_analysis(2, "Download Reference Genome", analysis)
 
     def run_step3(self):
@@ -149,9 +150,9 @@ Reasoning: All variants are called relative to this reference. Using a standard 
             subprocess.run(["samtools", "faidx", "ref/ecoli.fna"], check=True)
             pbar.update(1)
 
-        analysis = """Step 3: Indexing
-Purpose: Build index files for fast alignment.
-Reasoning: Allows BWA and samtools to quickly locate where reads belong in the genome."""
+        analysis = """Step 3: Reference Indexing
+Purpose: Build searchable index files for fast alignment.
+Reasoning: Dramatically improves speed and efficiency of read mapping."""
         self.log_step_analysis(3, "Index Reference", analysis)
 
     def run_step4(self):
@@ -164,10 +165,10 @@ Reasoning: Allows BWA and samtools to quickly locate where reads belong in the g
             ], check=True)
             pbar.update(1)
 
-        analysis = """Step 4: Data Input
-Purpose: Obtain raw sequencing reads.
-Context: Either from public SRA or user-provided local FASTQ files.
-Reasoning: This is the experimental data containing potential mutations."""
+        analysis = """Step 4: Sequencing Data Input
+Purpose: Acquire raw FASTQ reads for analysis.
+Context: Public SRA dataset or user-provided local FASTQ files.
+Reasoning: This is the experimental data containing potential biological variants."""
         self.log_step_analysis(4, "Download Reads", analysis)
 
     def run_step5(self):
@@ -183,10 +184,10 @@ Reasoning: This is the experimental data containing potential mutations."""
             ], check=True)
             pbar.update(1)
 
-        analysis = """Step 5: FastQC Quality Assessment
-Purpose: Evaluate raw read quality.
-Key Checks: Base quality, GC content, adapters, duplication.
-Reasoning: Identifies problems early before alignment."""
+        analysis = """Step 5: Quality Control (FastQC)
+Purpose: Assess quality of raw sequencing reads.
+Key Checks: Per-base quality, GC content, adapters, duplication levels.
+Reasoning: Early detection of problems prevents errors in downstream analysis."""
         self.log_step_analysis(5, "FastQC Quality Check", analysis)
 
     def run_step6(self):
@@ -202,9 +203,9 @@ Reasoning: Identifies problems early before alignment."""
             ], check=True)
             pbar.update(1)
 
-        analysis = """Step 6: Trimmomatic - Read Trimming
-Purpose: Remove low-quality bases and adapters.
-Reasoning: Improves alignment accuracy and reduces false variant calls."""
+        analysis = """Step 6: Read Trimming (Trimmomatic)
+Purpose: Remove low-quality bases and adapter sequences.
+Reasoning: Improves alignment accuracy and reduces false positive variant calls."""
         self.log_step_analysis(6, "Trim Reads", analysis)
 
     def run_step7(self):
@@ -231,9 +232,9 @@ Reasoning: Improves alignment accuracy and reduces false variant calls."""
 
             Path(str(bam_file).replace(".bam",".temp.bam")).unlink(missing_ok=True)
 
-        analysis = """Step 7: Alignment with BWA-MEM + Samtools
-Purpose: Map reads to reference and create sorted BAM.
-Reasoning: Accurate mapping is foundational for reliable variant detection."""
+        analysis = """Step 7: Alignment (BWA-MEM + Samtools)
+Purpose: Map cleaned reads to the reference genome.
+Reasoning: Accurate mapping is the foundation for reliable variant detection."""
         self.log_step_analysis(7, "Align Reads", analysis)
 
     def run_step8(self):
@@ -254,9 +255,9 @@ Reasoning: Accurate mapping is foundational for reliable variant detection."""
                 subprocess.run(["bcftools", "view", str(bcf_file)], stdout=f, check=True)
             pbar.update(1)
 
-        analysis = """Step 8: Variant Calling with BCFtools
+        analysis = """Step 8: Variant Calling (BCFtools)
 Purpose: Identify genomic differences between sample and reference.
-Reasoning: Uses pileup and statistical calling to detect true mutations."""
+Reasoning: Statistical approach distinguishes true mutations from sequencing errors."""
         self.log_step_analysis(8, "Call Variants", analysis)
 
     def display_polars_report(self):
@@ -287,16 +288,15 @@ Reasoning: Uses pileup and statistical calling to detect true mutations."""
         if "POS" in df.columns:
             df = df.with_columns(pl.col("POS").cast(pl.Int64))
 
-        self.logger.info("=" * 80)
+        self.logger.info("=" * 90)
         self.logger.info("FINAL POLARS MUTATION TABLE")
         self.logger.info(f"Total Variants: {df.height}")
-        self.logger.info("=" * 80)
+        self.logger.info("=" * 90)
 
         with pl.Config(tbl_rows=-1, tbl_cols=-1, tbl_formatting="ASCII_FULL"):
-            table_str = str(df)
-        self.logger.info(table_str)
+            self.logger.info(str(df))
 
-        self.logger.info("=" * 80)
+        self.logger.info("=" * 90)
 
         print("\n" + "="*70)
         print(f" POLARS MUTATION REPORT - Run {self.run_id} (Total Variants: {df.height})")
@@ -340,7 +340,7 @@ Reasoning: Uses pileup and statistical calling to detect true mutations."""
         self.print_header("Pipeline Completed Successfully!")
         print(f"\nRun ID: {self.run_id}")
         print(f"Results Location: {self.results_dir}")
-        print(f"Full Detailed Log: logs/pipeline_{self.sample_id}_{self.run_id}.log\n")
+        print(f"Full Detailed Log (with analysis): logs/pipeline_{self.sample_id}_{self.run_id}.log\n")
 
         self.display_polars_report()
         print("\n🎉 Pipeline finished successfully.\n")
