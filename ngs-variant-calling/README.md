@@ -5,7 +5,7 @@
 ### Input Modes
 
 1. **Public SRA Data (Default)**: Automatically fetches paired-end reads from the NCBI Sequence Read Archive (SRA) using `fasterq-dump`.  
-   *(Default sample: SRR1553607)*
+   *(Default sample: SRR39418081)*
 
 2. **Custom Local FASTQ**: Supports user-provided paired-end files (`_1.fastq` and `_2.fastq`) placed in the `data/` directory.
 
@@ -73,8 +73,8 @@ This pipeline follows rigorous microbial NGS best practices:
 ## Input Options
 
    1. **Option1: Public SRA Data (Default)**
-   The pipeline automatically downloads paired-end FASTQ files using fasterq-dump.
-   Default sample: SRR1553607
+   The pipeline automatically downloads paired-end FASTQ files using fasterq-dump, or enter the SRR number.
+   Default sample: SRR39418081
    2. **Option2: Custom Local FASTQ Files**
    
    Place your paired-end FASTQ files (.fastq or .fastq.gz) in the data/ folder (or any accessible location).
