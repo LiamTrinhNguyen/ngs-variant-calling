@@ -26,7 +26,7 @@ except ImportError:
 
 class NGSPipeline:
     def __init__(self):
-        self.sample_id = "SRR1553607"
+        self.sample_id = "SRR39418081"
         self.run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
         self._log_dir = "logs"
         self.results_dir = Path(f"results/run_{self.run_id}")
