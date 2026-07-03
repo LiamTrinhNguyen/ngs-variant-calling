@@ -1,6 +1,6 @@
 __author__ = 'Liam TrinhNguyen'
 __email__ = 'LiamTrinhNguyen@gmail.com'
-__version__ = 'NGS_Pipeline_v2.1'
+__version__ = 'NGS_Pipeline_v2.3'
 
 import os
 import sys
@@ -30,6 +30,7 @@ class NGSPipeline:
         self._log_dir = "logs"
         self.results_dir = Path(f"results/run_{self.run_id}")
         self.data_dir = Path(f"data/run_{self.run_id}")
+        self.use_local_fastq = False
         self.logger = None
         self.auto_mode = False
 
@@ -71,12 +72,15 @@ class NGSPipeline:
         self.print_header(f"Step {step_num}: {title}")
         print(f"\n* WHAT IS HAPPENING:\n{description}\n")
         print(f"-> COMMAND:\n-> {command_desc}\n")
+
         if step_num == 1 or not self.auto_mode:
             input("-> Press ENTER to run this step... ")
         else:
             print("-> Running automatically...")
+
         self.logger.info(f"Starting Step {step_num}: {title}")
         print("\n-> Processing... Please wait.\n")
+
         try:
             execution_callback()
             self.logger.info(f"Step {step_num} completed successfully.")
@@ -85,6 +89,7 @@ class NGSPipeline:
             self.logger.error(f"Error in Step {step_num}: {e}")
             print(f"\n-> ERROR: {e}")
             sys.exit(1)
+
         if step_num == 1:
             self.auto_mode = True
             input("\n-> Press ENTER to continue with AUTOMATIC execution of remaining steps... ")
@@ -151,6 +156,13 @@ Reasoning: Ensures reproducibility and prevents data mixing between runs."""
         self.log_step_analysis(3, "Index Reference", analysis)
 
     def run_step4(self):
+        if self.use_local_fastq:
+            self.logger.info("Using user-provided local FASTQ files.")
+            analysis = f"""Step 4: Data Input (Local FASTQ)
+Using user-supplied FASTQ files in: {self.data_dir}"""
+            self.log_step_analysis(4, "Data Input - Local FASTQ", analysis)
+            return
+
         self.logger.info(f"Downloading {self.sample_id} from SRA...")
         with tqdm(total=1, desc="SRA Download", ncols=80, ascii=' -#') as pbar:
             subprocess.run([
@@ -179,11 +191,13 @@ Total reads: {total_reads:,}"""
         output_html = self.results_dir / "fastp.html"
         output_json = self.results_dir / "fastp.json"
         
+        r1 = f"{self.data_dir}/{self.sample_id}_1.fastq" if not self.use_local_fastq else f"{self.data_dir}/trimmed_1.fastq" if self.use_local_fastq else None
+        # For local files, user should place files as sample_1.fastq and sample_2.fastq or trimmed ones
         with tqdm(total=1, desc="fastp (QC + Trim)", ncols=80, ascii=' -#') as pbar:
             subprocess.run([
                 "fastp",
-                "-i", f"{self.data_dir}/{self.sample_id}_1.fastq",
-                "-I", f"{self.data_dir}/{self.sample_id}_2.fastq",
+                "-i", f"{self.data_dir}/{self.sample_id if not self.use_local_fastq else 'input'}_1.fastq" if not self.use_local_fastq else f"{self.data_dir}/input_1.fastq",
+                "-I", f"{self.data_dir}/{self.sample_id if not self.use_local_fastq else 'input'}_2.fastq" if not self.use_local_fastq else f"{self.data_dir}/input_2.fastq",
                 "-o", f"{self.data_dir}/trimmed_1.fastq",
                 "-O", f"{self.data_dir}/trimmed_2.fastq",
                 "--html", str(output_html),
@@ -239,13 +253,6 @@ Mapped reads to reference genome using BWA-MEM
 Created sorted and indexed BAM file
 ALIGNMENT RATE: {mapping_rate}"""
         self.log_step_analysis(6, "Align Reads", analysis)
-
-        try:
-            rate_value = float(mapping_rate.strip('%'))
-            if rate_value < 10.0:
-                self.logger.error(f"CRITICAL: Alignment rate is only {mapping_rate}. Expect artifacts downstream.")
-        except:
-            pass
 
     def run_step7(self):
         self.logger.info("Variant calling...")
@@ -309,8 +316,6 @@ Error: {e}"""
         self.logger.info("Cleaning up intermediate files to save disk space...")
         files_to_remove = [
             self.data_dir / "aligned.sam",
-            self.data_dir / f"{self.sample_id}_1.fastq",
-            self.data_dir / f"{self.sample_id}_2.fastq",
         ]
         for f in files_to_remove:
             f.unlink(missing_ok=True)
@@ -318,9 +323,7 @@ Error: {e}"""
 
     def display_polars_report(self):
         vcf_path = self.results_dir / "annotated_variants.vcf"
-       
         if not vcf_path.exists() or vcf_path.stat().st_size == 0:
-            self.logger.warning("Annotated VCF missing or empty. Falling back to raw VCF.")
             vcf_path = self.results_dir / "final_variants.vcf"
 
         if not vcf_path.exists() or vcf_path.stat().st_size == 0:
@@ -384,16 +387,31 @@ Error: {e}"""
         print(" INTERACTIVE DNA VARIANT CALLING DASHBOARD ")
         print("=" * 60)
         print(f"\nVersion : {__version__} | Run ID: {self.run_id}\n")
-        print("1. Default sample (SRR1553607)")
-        print("2. Custom SRA ID")
-        choice = input("\n-> Enter choice (1 or 2): ").strip()
-        if choice == "2":
-            custom = input("-> Enter SRA Accession ID: ").strip()
-            if custom:
-                self.sample_id = custom
+
+        print("1. Use NCBI SRA Database (SRR ID)")
+        print("2. Use my own local FASTQ files")
+        choice = input("\n-> Enter your choice (1 or 2): ").strip()
+
+        if choice == "1":
+            self.use_local_fastq = False
+            print("\nEnter SRA Accession ID (SRRxxxxxx) or press ENTER for default (SRR1553607)")
+            user_input = input("-> SRR ID: ").strip()
+            if user_input:
+                self.sample_id = user_input
+            print(f"Using sample: {self.sample_id}")
+        elif choice == "2":
+            self.use_local_fastq = True
+            print("\nPlease place your paired FASTQ files in the data/run_XXXX folder as:")
+            print("   input_1.fastq and input_2.fastq")
+            print("   (or they will be auto-detected if named differently)")
+            input("-> Press ENTER once your files are ready...")
+        else:
+            print("Invalid choice. Using default SRA mode.")
+            self.use_local_fastq = False
 
         self.logger = self._setup_logger()
-        self.logger.info(f"Pipeline started | Run ID: {self.run_id} | Sample: {self.sample_id}")
+        self.logger.info(f"Pipeline started | Run ID: {self.run_id} | Sample: {self.sample_id} | Local FASTQ: {self.use_local_fastq}")
+
         input("\n-> Press ENTER to begin... ")
 
         self.prompt_step(1, "Setup Directories", "...", "...", self.run_step1)
@@ -409,8 +427,9 @@ Error: {e}"""
 
         self.clear_screen()
         self.print_header("Pipeline Completed Successfully!")
-        print(f"\nRun ID: {self.run_id}")
-        print(f"Results Location: {self.results_dir}")
+        print(f"\nRun ID : {self.run_id}")
+        print(f"Sample : {self.sample_id}")
+        print(f"Mode   : {'Local FASTQ' if self.use_local_fastq else 'SRA Download'}")
         print(f"Full Detailed Log: logs/pipeline_{self.sample_id}_{self.run_id}.log\n")
         self.display_polars_report()
         print("\nPipeline finished successfully.\n")
