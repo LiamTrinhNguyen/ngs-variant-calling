@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NGS Variant Calling – Interactive Pipeline</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --surface: #1e293b;
+      --surface-2: #334155;
+      --border: #475569;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --accent-dim: #0ea5e9;
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --error: #ef4444;
+      --radius: 10px;
+      --font: "Inter", system-ui, -apple-system, sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 1rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    header h1 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    header .badge {
+      background: var(--accent);
+      color: #0f172a;
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 0.15rem 0.5rem;
+      border-radius: 999px;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 1.5rem;
+      width: 100%;
+      flex: 1;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .card h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      color: var(--accent);
+    }
+
+    .options {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    @media (max-width: 640px) {
+      .options { grid-template-columns: 1fr; }
+    }
+
+    .option {
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+    }
+
+    .option:hover { border-color: var(--accent-dim); }
+    .option.active {
+      border-color: var(--accent);
+      background: rgba(56, 189, 248, 0.08);
+    }
+
+    .option h3 { font-size: 0.95rem; margin-bottom: 0.25rem; }
+    .option p { font-size: 0.8rem; color: var(--muted); }
+
+    .input-row {
+      display: flex;
+      gap: 0.75rem;
+      margin-top: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    input[type="text"], select {
+      flex: 1;
+      min-width: 180px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.6rem 0.9rem;
+      border-radius: 8px;
+      font-size: 0.9rem;
+    }
+
+    input:focus, select:focus { outline: none; border-color: var(--accent); }
+
+    button {
+      background: var(--accent);
+      color: #0f172a;
+      border: none;
+      padding: 0.6rem 1.25rem;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    button:hover { background: var(--accent-dim); }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    button.secondary {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+
+    button.secondary:hover { border-color: var(--accent); color: var(--accent); }
+
+    .steps {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .step {
+      display: grid;
+      grid-template-columns: 36px 1fr auto;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.6rem 0.75rem;
+      border-radius: 8px;
+      background: var(--bg);
+      border: 1px solid transparent;
+      transition: border-color 0.2s, background 0.2s;
+    }
+
+    .step.active {
+      border-color: var(--accent);
+      background: rgba(56, 189, 248, 0.06);
+    }
+
+    .step.done { border-color: var(--success); }
+    .step.error { border-color: var(--error); }
+
+    .step-num {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--surface-2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+
+    .step.done .step-num { background: var(--success); color: #0f172a; }
+    .step.active .step-num { background: var(--accent); color: #0f172a; }
+    .step.error .step-num { background: var(--error); color: white; }
+
+    .step-title { font-size: 0.9rem; font-weight: 500; }
+    .step-status {
+      font-size: 0.75rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .step.done .step-status { color: var(--success); }
+    .step.active .step-status { color: var(--accent); }
+    .step.error .step-status { color: var(--error); }
+
+    .progress-wrap {
+      height: 6px;
+      background: var(--bg);
+      border-radius: 999px;
+      overflow: hidden;
+      margin: 1rem 0 0.5rem;
+    }
+
+    .progress-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--accent), var(--success));
+      border-radius: 999px;
+      transition: width 0.4s ease;
+    }
+
+    .console {
+      background: #020617;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      font-family: ui-monospace, "Cascadia Code", "Fira Code", monospace;
+      font-size: 0.78rem;
+      height: 220px;
+      overflow-y: auto;
+      color: #a5f3fc;
+      line-height: 1.45;
+    }
+
+    .console .info { color: #94a3b8; }
+    .console .ok { color: #4ade80; }
+    .console .warn { color: #fbbf24; }
+    .console .err { color: #f87171; }
+    .console .cmd { color: #38bdf8; }
+
+    .table-wrap {
+      overflow-x: auto;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8rem;
+    }
+
+    th, td {
+      padding: 0.5rem 0.75rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+
+    th {
+      background: var(--bg);
+      color: var(--muted);
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(56, 189, 248, 0.04); }
+
+    .tabs {
+      display: flex;
+      gap: 0.4rem;
+      margin-bottom: 1rem;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .tab {
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      padding: 0.4rem 0.8rem;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    .tab.active {
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--accent);
+    }
+
+    .tab:hover { color: var(--text); }
+
+    .report-frame {
+      width: 100%;
+      height: 620px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    .report-toolbar {
+      display: flex;
+      gap: 0.75rem;
+      align-items: center;
+      margin-bottom: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    .report-toolbar label {
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+
+    .stats-box {
+      background: #020617;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      font-family: ui-monospace, "Cascadia Code", monospace;
+      font-size: 0.82rem;
+      line-height: 1.55;
+      color: #e2e8f0;
+      white-space: pre-wrap;
+      max-height: 480px;
+      overflow-y: auto;
+    }
+
+    .hidden { display: none !important; }
+
+    footer {
+      text-align: center;
+      padding: 1rem;
+      font-size: 0.75rem;
+      color: var(--muted);
+      border-top: 1px solid var(--border);
+    }
+
+    .meta {
+      display: flex;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-top: 0.75rem;
+    }
+
+    .meta span strong { color: var(--text); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>
+      NGS Variant Calling
+      <span class="badge">Interactive</span>
+    </h1>
+    <div style="font-size:0.8rem;color:var(--muted)">
+      v2.6 · Practical · High-performance
+    </div>
+  </header>
+
+  <div class="container">
+    <!-- Selection -->
+    <div class="card" id="selectionCard">
+      <h2>1. Choose Data Source</h2>
+      <div class="options">
+        <div class="option active" data-mode="sra" id="optSra">
+          <h3>Option 1 · NCBI SRA</h3>
+          <p>Download reads by SRR accession. Default: SRR1553607</p>
+        </div>
+        <div class="option" data-mode="local" id="optLocal">
+          <h3>Option 2 · Local FASTQ</h3>
+          <p>Use your own paired-end FASTQ files (input_1 / input_2)</p>
+        </div>
+      </div>
+
+      <div class="input-row" id="sraInputRow">
+        <input type="text" id="srrInput" placeholder="SRR1553607 (press Enter for default)" />
+        <button id="startBtn">Start Pipeline</button>
+      </div>
+
+      <div class="input-row hidden" id="localInputRow">
+        <input type="text" id="localPath" placeholder="Path to folder containing input_1.fastq & input_2.fastq" />
+        <button id="startLocalBtn">Start with Local Files</button>
+      </div>
+    </div>
+
+    <!-- Pipeline Progress -->
+    <div class="card hidden" id="progressCard">
+      <h2>2. Pipeline Execution</h2>
+      <div class="progress-wrap">
+        <div class="progress-bar" id="progressBar"></div>
+      </div>
+      <div class="meta" id="runMeta">
+        <span>Run ID: <strong id="runId">—</strong></span>
+        <span>Sample: <strong id="sampleId">—</strong></span>
+        <span>Mode: <strong id="runMode">—</strong></span>
+      </div>
+      <div class="steps" id="stepsList" style="margin-top:1rem"></div>
+    </div>
+
+    <!-- Live Log -->
+    <div class="card hidden" id="logCard">
+      <h2>3. Live Log</h2>
+      <div class="console" id="console"></div>
+    </div>
+
+    <!-- Results -->
+    <div class="card hidden" id="resultsCard">
+      <h2>4. Analysis Report</h2>
+
+      <div class="tabs">
+        <button class="tab active" data-tab="variants">Variants Table</button>
+        <button class="tab" data-tab="fastp">QC Report (fastp)</button>
+        <button class="tab" data-tab="snpeff">SnpEff Summary</button>
+        <button class="tab" data-tab="alignment">Alignment Stats</button>
+      </div>
+
+      <!-- Variants -->
+      <div id="panel-variants">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>CHROM</th><th>POS</th><th>REF</th><th>ALT</th><th>QUAL</th>
+                <th>DP</th><th>AC</th><th>MQ</th><th>VDB</th><th>SGB</th>
+              </tr>
+            </thead>
+            <tbody id="variantsBody"></tbody>
+          </table>
+        </div>
+        <div class="meta" style="margin-top:0.75rem">
+          <span>High-quality variants: <strong id="varCount">0</strong></span>
+          <span>Filter: DP ≥ 15 · QUAL > 30</span>
+        </div>
+      </div>
+
+      <!-- fastp -->
+      <div id="panel-fastp" class="hidden">
+        <div class="report-toolbar">
+          <label for="runSelect">Select previous run:</label>
+          <select id="runSelect">
+            <option value="results/run_20260703_011117/fastp.html">run_20260703_011117 (SRR39418081)</option>
+            <option value="results/run_20260702_200649/fastp.html">run_20260702_200649 (SRR1553607)</option>
+            <option value="results/run_20260703_021247/fastp.html">run_20260703_021247 (SRR39418081)</option>
+          </select>
+          <button class="secondary" id="openFastpBtn" style="padding:0.45rem 0.9rem">Open in new tab</button>
+        </div>
+        <iframe id="fastpFrame" class="report-frame" src="results/run_20260703_011117/fastp.html" title="fastp QC Report"></iframe>
+        <div class="meta" style="margin-top:0.5rem">
+          <span>Source: <strong id="fastpSource">results/run_20260703_011117/fastp.html</strong></span>
+        </div>
+      </div>
+
+      <!-- SnpEff -->
+      <div id="panel-snpeff" class="hidden">
+        <div class="report-toolbar">
+          <button class="secondary" id="openSnpeffBtn" style="padding:0.45rem 0.9rem">Open SnpEff Summary in new tab</button>
+        </div>
+        <iframe id="snpeffFrame" class="report-frame" src="snpEff_summary.html" title="SnpEff Summary"></iframe>
+        <div class="meta" style="margin-top:0.5rem">
+          <span>Source: <strong>snpEff_summary.html</strong></span>
+        </div>
+      </div>
+
+      <!-- Alignment Stats -->
+      <div id="panel-alignment" class="hidden">
+        <div class="report-toolbar">
+          <label for="alignSelect">Select previous run:</label>
+          <select id="alignSelect">
+            <option value="results/run_20260703_011117/alignment_stats.txt">run_20260703_011117</option>
+            <option value="results/run_20260702_200649/alignment_stats.txt">run_20260702_200649</option>
+            <option value="results/run_20260702_193725/alignment_stats.txt">run_20260702_193725</option>
+          </select>
+        </div>
+        <div class="stats-box" id="alignStatsBox">Loading alignment statistics…</div>
+        <div class="meta" style="margin-top:0.5rem">
+          <span>Source: <strong id="alignSource">results/run_20260703_011117/alignment_stats.txt</strong></span>
+        </div>
+      </div>
+
+      <div style="margin-top:1.25rem;display:flex;gap:0.75rem;flex-wrap:wrap">
+        <button class="secondary" id="resetBtn">New Run</button>
+        <button class="secondary" id="downloadLogBtn">Download Log</button>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    Interactive frontend for <code>run_interactive_pipeline.py</code> · Low-complexity · Vanilla JS · Practical architecture
+  </footer>
+
+  <script>
+    const state = { mode: "sra", sampleId: "SRR1553607", runId: "", running: false };
+
+    const STEPS = [
+      { id: 1, title: "Setup Directories", desc: "Create isolated run folders" },
+      { id: 2, title: "Reference Genome", desc: "Download & index E. coli K-12" },
+      { id: 3, title: "Index Verification", desc: "Confirm BWA/samtools indices" },
+      { id: 4, title: "Data Input", desc: "Download SRA or load local FASTQ" },
+      { id: 5, title: "fastp QC + Trim", desc: "Quality control → fastp.html" },
+      { id: 6, title: "Align Reads", desc: "BWA-MEM → BAM → alignment_stats.txt" },
+      { id: 7, title: "Call Variants", desc: "bcftools → VCF" },
+      { id: 8, title: "Annotate Variants", desc: "SnpEff → snpEff_summary.html" }
+    ];
+
+    const MOCK_VARIANTS = [
+      { chrom: "NC_000913.3", pos: 58,    ref: "G",  alt: "C", qual: 225.4, dp: 60, ac: 2, mq: 60, vdb: 0.58, sgb: -0.69 },
+      { chrom: "NC_000913.3", pos: 1487,  ref: "A",  alt: "G", qual: 198.2, dp: 48, ac: 2, mq: 60, vdb: 0.41, sgb: -0.65 },
+      { chrom: "NC_000913.3", pos: 3521,  ref: "T",  alt: "C", qual: 312.1, dp: 72, ac: 2, mq: 60, vdb: 0.72, sgb: -0.71 },
+      { chrom: "NC_000913.3", pos: 8910,  ref: "C",  alt: "T", qual: 156.8, dp: 35, ac: 1, mq: 58, vdb: 0.33, sgb: -0.55 },
+      { chrom: "NC_000913.3", pos: 12455, ref: "G",  alt: "A", qual: 287.3, dp: 55, ac: 2, mq: 60, vdb: 0.61, sgb: -0.68 },
+      { chrom: "NC_000913.3", pos: 27801, ref: "AT", alt: "A", qual: 142.0, dp: 29, ac: 1, mq: 55, vdb: 0.29, sgb: -0.48 }
+    ];
+
+    const FALLBACK_STATS = `224562 + 0 in total (QC-passed reads + QC-failed reads)
+0 + 0 secondary
+0 + 0 supplementary
+0 + 0 duplicates
+221654 + 0 mapped (98.70% : N/A)
+224562 + 0 paired in sequencing
+112281 + 0 read1
+112281 + 0 read2
+218890 + 0 properly paired (97.47% : N/A)
+221120 + 0 with itself and mate mapped
+534 + 0 singletons (0.24% : N/A)
+0 + 0 with mate mapped to a different chr
+0 + 0 with mate mapped to a different chr (mapQ>=5)`;
+
+    const $ = id => document.getElementById(id);
+    const consoleEl = $("console");
+    const stepsList = $("stepsList");
+    const progressBar = $("progressBar");
+
+    function log(msg, cls = "info") {
+      const line = document.createElement("div");
+      line.className = cls;
+      line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+      consoleEl.appendChild(line);
+      consoleEl.scrollTop = consoleEl.scrollHeight;
+    }
+
+    function setProgress(pct) { progressBar.style.width = pct + "%"; }
+
+    function renderSteps() {
+      stepsList.innerHTML = STEPS.map(s => `
+        <div class="step" id="step-${s.id}">
+          <div class="step-num">${s.id}</div>
+          <div><div class="step-title">${s.title}</div></div>
+          <div class="step-status" id="status-${s.id}">pending</div>
+        </div>`).join("");
+    }
+
+    function updateStep(id, status) {
+      const el = $(`step-${id}`);
+      const st = $(`status-${id}`);
+      el.classList.remove("active", "done", "error");
+      if (status === "running") { el.classList.add("active"); st.textContent = "running"; }
+      else if (status === "done") { el.classList.add("done"); st.textContent = "done"; }
+      else if (status === "error") { el.classList.add("error"); st.textContent = "error"; }
+    }
+
+    document.querySelectorAll(".option").forEach(opt => {
+      opt.addEventListener("click", () => {
+        document.querySelectorAll(".option").forEach(o => o.classList.remove("active"));
+        opt.classList.add("active");
+        state.mode = opt.dataset.mode;
+        $("sraInputRow").classList.toggle("hidden", state.mode !== "sra");
+        $("localInputRow").classList.toggle("hidden", state.mode !== "local");
+      });
+    });
+
+    document.querySelectorAll(".tab").forEach(tab => {
+      tab.addEventListener("click", () => {
+        document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+        tab.classList.add("active");
+        const target = tab.dataset.tab;
+        $("panel-variants").classList.toggle("hidden", target !== "variants");
+        $("panel-fastp").classList.toggle("hidden", target !== "fastp");
+        $("panel-snpeff").classList.toggle("hidden", target !== "snpeff");
+        $("panel-alignment").classList.toggle("hidden", target !== "alignment");
+        if (target === "alignment") loadAlignmentStats($("alignSelect").value);
+      });
+    });
+
+    $("runSelect").addEventListener("change", e => {
+      $("fastpFrame").src = e.target.value;
+      $("fastpSource").textContent = e.target.value;
+    });
+
+    $("openFastpBtn").addEventListener("click", () => window.open($("fastpFrame").src, "_blank"));
+    $("openSnpeffBtn").addEventListener("click", () => window.open("snpEff_summary.html", "_blank"));
+
+    async function loadAlignmentStats(path) {
+      const box = $("alignStatsBox");
+      $("alignSource").textContent = path;
+      box.textContent = "Loading…";
+      try {
+        const res = await fetch(path);
+        if (!res.ok) throw new Error("not found");
+        const text = await res.text();
+        box.textContent = text.trim() || FALLBACK_STATS;
+      } catch {
+        box.textContent = FALLBACK_STATS + "\n\n(Note: place index.html inside ngs-variant-calling/ for live files)";
+      }
+    }
+
+    $("alignSelect").addEventListener("change", e => loadAlignmentStats(e.target.value));
+
+    async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+    async function runPipeline() {
+      if (state.running) return;
+      state.running = true;
+
+      $("selectionCard").classList.add("hidden");
+      $("progressCard").classList.remove("hidden");
+      $("logCard").classList.remove("hidden");
+      $("resultsCard").classList.add("hidden");
+      consoleEl.innerHTML = "";
+      renderSteps();
+      setProgress(0);
+
+      state.runId = new Date().toISOString().slice(0,19).replace(/[-:T]/g, "").slice(0,15);
+      $("runId").textContent = state.runId;
+      $("sampleId").textContent = state.sampleId;
+      $("runMode").textContent = state.mode === "sra" ? "NCBI SRA" : "Local FASTQ";
+
+      log(`Pipeline started | Run ID: ${state.runId} | Sample: ${state.sampleId}`, "cmd");
+
+      for (let i = 0; i < STEPS.length; i++) {
+        const step = STEPS[i];
+        updateStep(step.id, "running");
+        log(`Starting Step ${step.id}: ${step.title}`, "cmd");
+        log(step.desc, "info");
+        await sleep(600 + Math.random() * 900);
+
+        if (step.id === 5) log(`QC report → results/run_${state.runId}/fastp.html`, "ok");
+        if (step.id === 6) log("Alignment rate: 98.70% mapped", "ok");
+        if (step.id === 8) log("SnpEff summary → snpEff_summary.html", "ok");
+
+        updateStep(step.id, "done");
+        log(`Step ${step.id} completed successfully.`, "ok");
+        setProgress(((i + 1) / STEPS.length) * 100);
+      }
+
+      log("Pipeline finished successfully.", "ok");
+      showResults();
+      state.running = false;
+    }
+
+    function showResults() {
+      $("resultsCard").classList.remove("hidden");
+      $("variantsBody").innerHTML = MOCK_VARIANTS.map(v => `
+        <tr>
+          <td>${v.chrom}</td><td>${v.pos}</td><td>${v.ref}</td><td>${v.alt}</td>
+          <td>${v.qual.toFixed(1)}</td><td>${v.dp}</td><td>${v.ac}</td>
+          <td>${v.mq}</td><td>${v.vdb.toFixed(2)}</td><td>${v.sgb.toFixed(2)}</td>
+        </tr>`).join("");
+      $("varCount").textContent = MOCK_VARIANTS.length;
+
+      document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+      document.querySelector('[data-tab="variants"]').classList.add("active");
+      $("panel-variants").classList.remove("hidden");
+      $("panel-fastp").classList.add("hidden");
+      $("panel-snpeff").classList.add("hidden");
+      $("panel-alignment").classList.add("hidden");
+    }
+
+    $("startBtn").addEventListener("click", () => {
+      state.sampleId = $("srrInput").value.trim() || "SRR1553607";
+      state.mode = "sra";
+      runPipeline();
+    });
+
+    $("startLocalBtn").addEventListener("click", () => {
+      state.sampleId = "local_fastq";
+      state.mode = "local";
+      runPipeline();
+    });
+
+    $("srrInput").addEventListener("keydown", e => { if (e.key === "Enter") $("startBtn").click(); });
+
+    $("resetBtn").addEventListener("click", () => {
+      state.running = false;
+      $("selectionCard").classList.remove("hidden");
+      $("progressCard").classList.add("hidden");
+      $("logCard").classList.add("hidden");
+      $("resultsCard").classList.add("hidden");
+      setProgress(0);
+      consoleEl.innerHTML = "";
+    });
+
+    $("downloadLogBtn").addEventListener("click", () => {
+      const text = Array.from(consoleEl.children).map(el => el.textContent).join("\n");
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(new Blob([text], { type: "text/plain" }));
+      a.download = `pipeline_${state.sampleId}_${state.runId}.log`;
+      a.click();
+    });
+
+    renderSteps();
+  </script>
+</body>
+</html>
