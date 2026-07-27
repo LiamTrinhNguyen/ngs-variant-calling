@@ -334,6 +334,80 @@
       overflow-y: auto;
     }
 
+    /* Info panels for SRA + Reference */
+    .info-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+
+    @media (max-width: 800px) {
+      .info-grid { grid-template-columns: 1fr; }
+    }
+
+    .info-panel {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem;
+    }
+
+    .info-panel h3 {
+      font-size: 0.9rem;
+      color: var(--accent);
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .info-table {
+      width: 100%;
+      font-size: 0.8rem;
+      border-collapse: collapse;
+    }
+
+    .info-table td {
+      padding: 0.35rem 0.4rem;
+      border-bottom: 1px solid rgba(71, 85, 105, 0.5);
+      vertical-align: top;
+    }
+
+    .info-table td:first-child {
+      color: var(--muted);
+      width: 42%;
+      white-space: nowrap;
+    }
+
+    .info-table td:last-child {
+      color: var(--text);
+      word-break: break-word;
+    }
+
+    .info-table tr:last-child td { border-bottom: none; }
+
+    .badge-sm {
+      display: inline-block;
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 0.1rem 0.4rem;
+      border-radius: 999px;
+      background: rgba(56, 189, 248, 0.2);
+      color: var(--accent);
+    }
+
+    .loading-text {
+      color: var(--muted);
+      font-size: 0.85rem;
+      font-style: italic;
+    }
+
+    .link-out {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    .link-out:hover { text-decoration: underline; }
+
     .hidden { display: none !important; }
 
     footer {
@@ -363,7 +437,7 @@
       <span class="badge">Interactive</span>
     </h1>
     <div style="font-size:0.8rem;color:var(--muted)">
-      v2.6 · Practical · High-performance
+      v2.7 · Practical · High-performance
     </div>
   </header>
 
@@ -374,7 +448,7 @@
       <div class="options">
         <div class="option active" data-mode="sra" id="optSra">
           <h3>Option 1 · NCBI SRA</h3>
-          <p>Download reads by SRR accession. Default: SRR1553607</p>
+          <p>Download reads by SRR accession. Fetches live metadata from NCBI/ENA.</p>
         </div>
         <div class="option" data-mode="local" id="optLocal">
           <h3>Option 2 · Local FASTQ</h3>
@@ -390,6 +464,30 @@
       <div class="input-row hidden" id="localInputRow">
         <input type="text" id="localPath" placeholder="Path to folder containing input_1.fastq & input_2.fastq" />
         <button id="startLocalBtn">Start with Local Files</button>
+      </div>
+    </div>
+
+    <!-- Comprehensive Info Panels (SRA + Reference) -->
+    <div class="card hidden" id="infoCard">
+      <h2>Sample &amp; Reference Information</h2>
+      <div class="info-grid">
+        <!-- Input Data Panel -->
+        <div class="info-panel" id="sraInfoPanel">
+          <h3>
+            <span>📥</span> Input Sequencing Data
+            <span class="badge-sm">NCBI SRA / ENA</span>
+          </h3>
+          <div id="sraInfoContent" class="loading-text">Fetching metadata from NCBI/ENA…</div>
+        </div>
+
+        <!-- Reference Panel -->
+        <div class="info-panel" id="refInfoPanel">
+          <h3>
+            <span>🧬</span> Reference Genome
+            <span class="badge-sm">Fixed</span>
+          </h3>
+          <div id="refInfoContent"></div>
+        </div>
       </div>
     </div>
 
@@ -535,6 +633,20 @@
 0 + 0 with mate mapped to a different chr
 0 + 0 with mate mapped to a different chr (mapQ>=5)`;
 
+    // Comprehensive Reference Genome info (always the same in this pipeline)
+    const REFERENCE_INFO = {
+      organism: "Escherichia coli str. K-12 substr. MG1655",
+      accession: "NC_000913.3",
+      assembly: "ASM584v2 (GCF_000005845.2)",
+      length: "4,641,652 bp",
+      gc: "50.79%",
+      genes: "~4,500 protein-coding genes",
+      topology: "Circular chromosome",
+      source: "NCBI RefSeq",
+      download: "ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/005/845/...",
+      description: "The classic laboratory strain of E. coli. Widely used as the standard reference for bacterial genomics and variant calling demonstrations."
+    };
+
     const $ = id => document.getElementById(id);
     const consoleEl = $("console");
     const stepsList = $("stepsList");
@@ -568,6 +680,143 @@
       else if (status === "error") { el.classList.add("error"); st.textContent = "error"; }
     }
 
+    // ---------- Render Reference Info (always available) ----------
+    function renderReferenceInfo() {
+      const r = REFERENCE_INFO;
+      $("refInfoContent").innerHTML = `
+        <table class="info-table">
+          <tr><td>Organism</td><td>${r.organism}</td></tr>
+          <tr><td>Accession</td><td><a class="link-out" href="https://www.ncbi.nlm.nih.gov/nuccore/${r.accession}" target="_blank">${r.accession}</a></td></tr>
+          <tr><td>Assembly</td><td>${r.assembly}</td></tr>
+          <tr><td>Length</td><td>${r.length}</td></tr>
+          <tr><td>GC Content</td><td>${r.gc}</td></tr>
+          <tr><td>Genes</td><td>${r.genes}</td></tr>
+          <tr><td>Topology</td><td>${r.topology}</td></tr>
+          <tr><td>Source</td><td>${r.source}</td></tr>
+          <tr><td>Description</td><td>${r.description}</td></tr>
+        </table>
+      `;
+    }
+
+    // ---------- Fetch real SRA / ENA metadata ----------
+    async function fetchSraMetadata(srr) {
+      const content = $("sraInfoContent");
+      content.innerHTML = `<span class="loading-text">Connecting to ENA / NCBI for <strong>${srr}</strong>…</span>`;
+
+      // ENA Portal API (CORS-friendly, excellent metadata)
+      const fields = [
+        "run_accession", "sample_accession", "experiment_accession", "study_accession",
+        "scientific_name", "tax_id", "library_strategy", "library_source", "library_selection",
+        "library_layout", "instrument_platform", "instrument_model",
+        "base_count", "read_count", "spot_count", "center_name", "first_public", "last_updated"
+      ].join(",");
+
+      const url = `https://www.ebi.ac.uk/ena/portal/api/filereport?accession=${encodeURIComponent(srr)}&result=read_run&fields=${fields}&format=json`;
+
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+
+        if (!data || data.length === 0) {
+          throw new Error("No records returned");
+        }
+
+        const rec = data[0];
+        const bases = rec.base_count ? Number(rec.base_count).toLocaleString() : "—";
+        const reads = rec.read_count ? Number(rec.read_count).toLocaleString() : "—";
+        const spots = rec.spot_count ? Number(rec.spot_count).toLocaleString() : "—";
+
+        content.innerHTML = `
+          <table class="info-table">
+            <tr><td>Run Accession</td><td><a class="link-out" href="https://www.ncbi.nlm.nih.gov/sra/${rec.run_accession}" target="_blank">${rec.run_accession || srr}</a></td></tr>
+            <tr><td>Sample</td><td>${rec.sample_accession || "—"}</td></tr>
+            <tr><td>Experiment</td><td>${rec.experiment_accession || "—"}</td></tr>
+            <tr><td>Study</td><td>${rec.study_accession || "—"}</td></tr>
+            <tr><td>Organism</td><td>${rec.scientific_name || "—"} (taxid ${rec.tax_id || "—"})</td></tr>
+            <tr><td>Library Strategy</td><td>${rec.library_strategy || "—"}</td></tr>
+            <tr><td>Library Source</td><td>${rec.library_source || "—"}</td></tr>
+            <tr><td>Library Selection</td><td>${rec.library_selection || "—"}</td></tr>
+            <tr><td>Library Layout</td><td>${rec.library_layout || "—"}</td></tr>
+            <tr><td>Platform</td><td>${rec.instrument_platform || "—"}</td></tr>
+            <tr><td>Instrument</td><td>${rec.instrument_model || "—"}</td></tr>
+            <tr><td>Total Bases</td><td>${bases}</td></tr>
+            <tr><td>Total Reads</td><td>${reads}</td></tr>
+            <tr><td>Spots</td><td>${spots}</td></tr>
+            <tr><td>Center</td><td>${rec.center_name || "—"}</td></tr>
+            <tr><td>First Public</td><td>${rec.first_public || "—"}</td></tr>
+            <tr><td>Last Updated</td><td>${rec.last_updated || "—"}</td></tr>
+            <tr><td>Links</td>
+              <td>
+                <a class="link-out" href="https://www.ncbi.nlm.nih.gov/sra/${srr}" target="_blank">NCBI SRA</a> ·
+                <a class="link-out" href="https://www.ebi.ac.uk/ena/browser/view/${srr}" target="_blank">ENA Browser</a>
+              </td>
+            </tr>
+          </table>
+        `;
+        log(`Successfully retrieved metadata for ${srr} from ENA/NCBI`, "ok");
+        return true;
+      } catch (err) {
+        console.warn("ENA fetch failed:", err);
+        // Fallback static info for known demo accessions
+        const fallback = getFallbackSraInfo(srr);
+        content.innerHTML = `
+          <table class="info-table">
+            ${fallback}
+            <tr><td colspan="2" style="color:var(--warning);font-size:0.75rem;padding-top:0.5rem">
+              Live fetch unavailable (CORS / network). Showing cached information.
+            </td></tr>
+          </table>
+        `;
+        log(`Could not reach ENA API – using fallback metadata for ${srr}`, "warn");
+        return false;
+      }
+    }
+
+    function getFallbackSraInfo(srr) {
+      // Known demo samples used in this project
+      const known = {
+        "SRR1553607": {
+          organism: "Escherichia coli",
+          strategy: "WGS",
+          layout: "PAIRED",
+          platform: "ILLUMINA",
+          model: "Illumina HiSeq 2000",
+          note: "Classic E. coli demonstration dataset"
+        },
+        "SRR39418081": {
+          organism: "Escherichia coli",
+          strategy: "WGS",
+          layout: "PAIRED",
+          platform: "ILLUMINA",
+          model: "Illumina",
+          note: "Project demonstration run"
+        }
+      };
+
+      const k = known[srr] || {
+        organism: "Unknown (fetch failed)",
+        strategy: "—", layout: "—", platform: "—", model: "—", note: "Metadata not available offline"
+      };
+
+      return `
+        <tr><td>Run Accession</td><td><a class="link-out" href="https://www.ncbi.nlm.nih.gov/sra/${srr}" target="_blank">${srr}</a></td></tr>
+        <tr><td>Organism</td><td>${k.organism}</td></tr>
+        <tr><td>Library Strategy</td><td>${k.strategy}</td></tr>
+        <tr><td>Library Layout</td><td>${k.layout}</td></tr>
+        <tr><td>Platform</td><td>${k.platform}</td></tr>
+        <tr><td>Instrument</td><td>${k.model}</td></tr>
+        <tr><td>Note</td><td>${k.note}</td></tr>
+        <tr><td>Links</td>
+          <td>
+            <a class="link-out" href="https://www.ncbi.nlm.nih.gov/sra/${srr}" target="_blank">NCBI SRA</a> ·
+            <a class="link-out" href="https://www.ebi.ac.uk/ena/browser/view/${srr}" target="_blank">ENA Browser</a>
+          </td>
+        </tr>
+      `;
+    }
+
+    // ---------- Mode selection ----------
     document.querySelectorAll(".option").forEach(opt => {
       opt.addEventListener("click", () => {
         document.querySelectorAll(".option").forEach(o => o.classList.remove("active"));
@@ -578,6 +827,7 @@
       });
     });
 
+    // ---------- Tabs ----------
     document.querySelectorAll(".tab").forEach(tab => {
       tab.addEventListener("click", () => {
         document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
@@ -622,6 +872,7 @@
       state.running = true;
 
       $("selectionCard").classList.add("hidden");
+      $("infoCard").classList.remove("hidden");
       $("progressCard").classList.remove("hidden");
       $("logCard").classList.remove("hidden");
       $("resultsCard").classList.add("hidden");
@@ -633,6 +884,22 @@
       $("runId").textContent = state.runId;
       $("sampleId").textContent = state.sampleId;
       $("runMode").textContent = state.mode === "sra" ? "NCBI SRA" : "Local FASTQ";
+
+      // Always show reference info
+      renderReferenceInfo();
+
+      // Fetch SRA metadata only for Option 1
+      if (state.mode === "sra") {
+        log(`Querying NCBI/ENA for comprehensive metadata of ${state.sampleId}…`, "cmd");
+        await fetchSraMetadata(state.sampleId);
+      } else {
+        $("sraInfoContent").innerHTML = `
+          <table class="info-table">
+            <tr><td>Mode</td><td>Local FASTQ files</td></tr>
+            <tr><td>Note</td><td>No remote SRA metadata – using user-supplied reads</td></tr>
+          </table>
+        `;
+      }
 
       log(`Pipeline started | Run ID: ${state.runId} | Sample: ${state.sampleId}`, "cmd");
 
@@ -692,6 +959,7 @@
     $("resetBtn").addEventListener("click", () => {
       state.running = false;
       $("selectionCard").classList.remove("hidden");
+      $("infoCard").classList.add("hidden");
       $("progressCard").classList.add("hidden");
       $("logCard").classList.add("hidden");
       $("resultsCard").classList.add("hidden");
@@ -707,6 +975,8 @@
       a.click();
     });
 
+    // Initialize reference panel content (hidden until run)
+    renderReferenceInfo();
     renderSteps();
   </script>
 </body>
