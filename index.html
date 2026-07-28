@@ -234,14 +234,21 @@ $ </div>
     }
 
     function parseTerminalForPanels(fullLog) {
-      const inputMatch = fullLog.match(/\[INFO\] Fetching fastq files for (.+?) via (.+?)\.\.\./);
-      if (inputMatch) {
+      const inputBlock = fullLog.match(/=== INPUT FEED \(NCBI\/ENA\) ===([\s\S]*?)=== END INPUT ===/);
+      if (inputBlock) {
         $("inputBadge").textContent = "Captured";
         $("inputBadge").className = "badge-sm badge-ok";
-        $("panelInput").innerHTML =
-          "Target accession: <strong>" + inputMatch[1] + "</strong><br>" +
-          "Downloader: <code>" + inputMatch[2] + "</code>" +
-          "<pre>Status: Paired FASTQs mapped for this run.</pre>";
+        $("panelInput").innerHTML = "<pre>" + inputBlock[1].trim() + "</pre>";
+      } else {
+        const inputMatch = fullLog.match(/\[INFO\] Fetching fastq files for (.+?) via (.+?)\.\.\./);
+        if (inputMatch) {
+          $("inputBadge").textContent = "Captured";
+          $("inputBadge").className = "badge-sm badge-ok";
+          $("panelInput").innerHTML =
+            "Target accession: <strong>" + inputMatch[1] + "</strong><br>" +
+            "Downloader: <code>" + inputMatch[2] + "</code>" +
+            "<pre>Status: Paired FASTQs mapped for this run.</pre>";
+        }
       }
 
       const localMatch = fullLog.match(/\[INFO\] Using local FASTQ pair under (.+)/);
@@ -254,14 +261,21 @@ $ </div>
           "<pre>input_1.fastq + input_2.fastq</pre>";
       }
 
-      const refMatch = fullLog.match(/\[INFO\] Aligning reads against (.+?) using (.+?)\.\.\./);
-      if (refMatch) {
+      const refBlock = fullLog.match(/=== REFERENCE GENOME \(NCBI\) ===([\s\S]*?)=== END REFERENCE ===/);
+      if (refBlock) {
         $("refBadge").textContent = "Indexed";
         $("refBadge").className = "badge-sm badge-ok";
-        $("panelRef").innerHTML =
-          "Reference: <code>" + refMatch[1] + "</code><br>" +
-          "Aligner: <strong>" + refMatch[2] + "</strong>" +
-          "<pre>Index status: BWA index verified (ref/ecoli.fna*).</pre>";
+        $("panelRef").innerHTML = "<pre>" + refBlock[1].trim() + "</pre>";
+      } else {
+        const refMatch = fullLog.match(/\[INFO\] Aligning reads against (.+?) using (.+?)\.\.\./);
+        if (refMatch) {
+          $("refBadge").textContent = "Indexed";
+          $("refBadge").className = "badge-sm badge-ok";
+          $("panelRef").innerHTML =
+            "Reference: <code>" + refMatch[1] + "</code><br>" +
+            "Aligner: <strong>" + refMatch[2] + "</strong>" +
+            "<pre>Index status: BWA index verified (ref/ecoli.fna*).</pre>";
+        }
       }
 
       const resMatch = fullLog.match(/\[SUCCESS\] Variants written to (.+)/);
@@ -277,9 +291,101 @@ $ </div>
         $("logBadge").textContent = "Active";
         $("logBadge").className = "badge-sm badge-ok";
         const lines = fullLog.split("\n").filter(function (l) {
-          return l.includes("[") || l.trim().startsWith("$");
-        }).slice(-6);
+          return l.includes("[") || l.trim().startsWith("$") || l.includes("===");
+        }).slice(-8);
         $("panelLog").innerHTML = "<pre>" + lines.join("\n") + "</pre>";
+      }
+    }
+
+    async function lookupSampleMeta(acc) {
+      // Try live ENA; fall back to structured placeholder tied to accession
+      const fields = [
+        "run_accession", "sample_accession", "experiment_accession", "study_accession",
+        "scientific_name", "tax_id", "library_strategy", "library_source",
+        "library_layout", "instrument_platform", "instrument_model",
+        "base_count", "read_count", "center_name", "first_public"
+      ].join(",");
+      try {
+        if (location.protocol === "file:") throw new Error("file protocol");
+        const url =
+          "https://www.ebi.ac.uk/ena/portal/api/filereport?accession=" +
+          encodeURIComponent(acc) +
+          "&result=read_run&fields=" + fields + "&format=json&download=true";
+        const res = await fetch(url, { mode: "cors" });
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const data = await res.json();
+        if (!data || !data.length) throw new Error("empty");
+        const r = data[0];
+        return {
+          live: true,
+          run: r.run_accession || acc,
+          sample: r.sample_accession || "—",
+          experiment: r.experiment_accession || "—",
+          study: r.study_accession || "—",
+          organism: r.scientific_name || "—",
+          tax_id: r.tax_id || "—",
+          strategy: r.library_strategy || "—",
+          source: r.library_source || "—",
+          layout: r.library_layout || "—",
+          platform: (r.instrument_platform || "—") + " / " + (r.instrument_model || "—"),
+          bases: r.base_count ? Number(r.base_count).toLocaleString() : "—",
+          reads: r.read_count ? Number(r.read_count).toLocaleString() : "—",
+          center: r.center_name || "—",
+          public: r.first_public || "—"
+        };
+      } catch (e) {
+        return {
+          live: false,
+          run: acc,
+          sample: "—",
+          experiment: "—",
+          study: "—",
+          organism: "Escherichia coli (assumed for demo pipeline)",
+          tax_id: "562",
+          strategy: "WGS",
+          source: "GENOMIC",
+          layout: "PAIRED",
+          platform: "ILLUMINA / —",
+          bases: "—",
+          reads: "—",
+          center: "—",
+          public: "—"
+        };
+      }
+    }
+
+    async function lookupRefMeta() {
+      const accession = "NC_000913.3";
+      try {
+        if (location.protocol === "file:") throw new Error("file protocol");
+        const url =
+          "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=nucleotide&id=" +
+          encodeURIComponent(accession) + "&retmode=json";
+        const res = await fetch(url, { mode: "cors" });
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const json = await res.json();
+        const uids = (json.result && json.result.uids) || [];
+        if (!uids.length) throw new Error("no uid");
+        const rec = json.result[uids[0]] || {};
+        return {
+          live: true,
+          accession: accession,
+          title: rec.title || "Escherichia coli str. K-12 substr. MG1655, complete genome",
+          length: rec.length ? Number(rec.length).toLocaleString() + " bp" : "4,641,652 bp",
+          taxid: rec.taxid || "511145",
+          source: rec.source || "Escherichia coli str. K-12 substr. MG1655",
+          local: "ref/ecoli.fna (+ BWA index)"
+        };
+      } catch (e) {
+        return {
+          live: false,
+          accession: accession,
+          title: "Escherichia coli str. K-12 substr. MG1655, complete genome",
+          length: "4,641,652 bp",
+          taxid: "511145",
+          source: "Escherichia coli str. K-12 substr. MG1655",
+          local: "ref/ecoli.fna (+ BWA index)"
+        };
       }
     }
 
@@ -298,23 +404,67 @@ $ </div>
         : "python run_interactive_pipeline.py --sample " + acc;
 
       appendTerminal("$ " + cmd);
-      await delay(500);
-      appendTerminal("[DIAGNOSTIC] Setting up thread pools and environment variables.");
       await delay(400);
+      appendTerminal("[DIAGNOSTIC] Setting up thread pools and environment variables.");
+      await delay(350);
 
+      // ---- INPUT FEED details (NCBI/ENA) printed to terminal ----
       if (isLocal) {
         appendTerminal("[INFO] Using local FASTQ pair under data/run_*/");
+        appendTerminal("=== INPUT FEED (LOCAL) ===");
+        appendTerminal("  Mode            : Local FASTQ");
+        appendTerminal("  Expected files  : data/run_*/input_1.fastq");
+        appendTerminal("  Expected files  : data/run_*/input_2.fastq");
+        appendTerminal("  Source          : User-provided (not downloaded from NCBI)");
+        appendTerminal("=== END INPUT ===");
       } else {
+        appendTerminal("[INFO] Resolving accession " + acc + " against NCBI/ENA metadata...");
+        const meta = await lookupSampleMeta(acc);
         appendTerminal("[INFO] Fetching fastq files for " + acc + " via fasterq-dump...");
+        appendTerminal("=== INPUT FEED (NCBI/ENA) ===");
+        appendTerminal("  Run accession   : " + meta.run);
+        appendTerminal("  Sample          : " + meta.sample);
+        appendTerminal("  Experiment      : " + meta.experiment);
+        appendTerminal("  Study           : " + meta.study);
+        appendTerminal("  Organism        : " + meta.organism);
+        appendTerminal("  Tax ID          : " + meta.tax_id);
+        appendTerminal("  Strategy        : " + meta.strategy);
+        appendTerminal("  Source          : " + meta.source);
+        appendTerminal("  Layout          : " + meta.layout);
+        appendTerminal("  Platform        : " + meta.platform);
+        appendTerminal("  Bases / Reads   : " + meta.bases + " / " + meta.reads);
+        appendTerminal("  Center          : " + meta.center);
+        appendTerminal("  First public    : " + meta.public);
+        appendTerminal("  Metadata live   : " + (meta.live ? "yes (ENA/NCBI)" : "fallback / offline"));
+        appendTerminal("  Local copy path : data/run_*/" + acc + "_{1,2}.fastq");
+        appendTerminal("  NCBI SRA URL    : https://www.ncbi.nlm.nih.gov/sra/" + acc);
+        appendTerminal("  ENA URL         : https://www.ebi.ac.uk/ena/browser/view/" + acc);
+        appendTerminal("=== END INPUT ===");
       }
-      await delay(900);
+      await delay(700);
+
+      // ---- REFERENCE details (NCBI) printed to terminal ----
+      appendTerminal("[INFO] Preparing reference genome (copy/index from NCBI if missing)...");
+      const ref = await lookupRefMeta();
+      appendTerminal("=== REFERENCE GENOME (NCBI) ===");
+      appendTerminal("  Accession       : " + ref.accession);
+      appendTerminal("  Title           : " + ref.title);
+      appendTerminal("  Length          : " + ref.length);
+      appendTerminal("  Tax ID          : " + ref.taxid);
+      appendTerminal("  Source organism : " + ref.source);
+      appendTerminal("  Local FASTA     : " + ref.local);
+      appendTerminal("  NCBI URL        : https://www.ncbi.nlm.nih.gov/nuccore/" + ref.accession);
+      appendTerminal("  Metadata live   : " + (ref.live ? "yes (NCBI E-utilities)" : "fallback / offline"));
+      appendTerminal("  Action          : ensure ref/ecoli.fna + bwa index + samtools faidx");
+      appendTerminal("=== END REFERENCE ===");
+      await delay(500);
 
       appendTerminal("[INFO] Aligning reads against ref/ecoli.fna using BWA MEM...");
-      await delay(900);
+      await delay(800);
       appendTerminal("[INFO] Sorting alignments and computing coverage via Samtools...");
-      await delay(700);
-      appendTerminal("[INFO] Calling variants with bcftools mpileup | call...");
       await delay(600);
+      appendTerminal("[INFO] Calling variants with bcftools mpileup | call...");
+      await delay(500);
 
       const outVcf = isLocal
         ? "results/run_local/final_variants.vcf"
