@@ -3,823 +3,386 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>NGS Variant Calling – Interactive Pipeline</title>
+  <title>NGS Variant Calling – Sample & Reference</title>
   <style>
     :root {
-      --bg: #0f172a;
-      --surface: #1e293b;
-      --surface-2: #334155;
-      --border: #475569;
-      --text: #f1f5f9;
-      --muted: #94a3b8;
-      --accent: #38bdf8;
-      --accent-dim: #0ea5e9;
-      --success: #22c55e;
-      --warning: #f59e0b;
-      --error: #ef4444;
-      --radius: 10px;
+      --bg: #0f172a; --surface: #1e293b; --surface-2: #334155; --border: #475569;
+      --text: #f1f5f9; --muted: #94a3b8; --accent: #38bdf8; --accent-dim: #0ea5e9;
+      --success: #22c55e; --warning: #f59e0b; --error: #ef4444; --radius: 10px;
       --font: "Inter", system-ui, -apple-system, sans-serif;
     }
-
     * { box-sizing: border-box; margin: 0; padding: 0; }
-
     body {
-      font-family: var(--font);
-      background: var(--bg);
-      color: var(--text);
-      line-height: 1.5;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
+      font-family: var(--font); background: var(--bg); color: var(--text);
+      line-height: 1.5; min-height: 100vh; display: flex; flex-direction: column;
     }
-
     header {
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      padding: 1rem 1.5rem;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 1rem;
-      flex-wrap: wrap;
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      padding: 1rem 1.5rem; display: flex; align-items: center;
+      justify-content: space-between; gap: 1rem; flex-wrap: wrap;
     }
-
-    header h1 {
-      font-size: 1.25rem;
-      font-weight: 600;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-
-    header .badge {
-      background: var(--accent);
-      color: #0f172a;
-      font-size: 0.7rem;
-      font-weight: 700;
-      padding: 0.15rem 0.5rem;
-      border-radius: 999px;
-    }
-
-    .container {
-      max-width: 1100px;
-      margin: 0 auto;
-      padding: 1.5rem;
-      width: 100%;
-      flex: 1;
-    }
-
+    header h1 { font-size: 1.2rem; font-weight: 600; }
+    header .sub { font-size: 0.8rem; color: var(--muted); }
+    .container { max-width: 1000px; margin: 0 auto; padding: 1.5rem; width: 100%; flex: 1; }
     .card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 1.25rem;
-      margin-bottom: 1.25rem;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 1.25rem; margin-bottom: 1.25rem;
     }
-
-    .card h2 {
-      font-size: 1rem;
-      font-weight: 600;
-      margin-bottom: 1rem;
-      color: var(--accent);
-    }
-
-    .options {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1rem;
-      margin-bottom: 1rem;
-    }
-
-    @media (max-width: 640px) {
-      .options { grid-template-columns: 1fr; }
-    }
-
+    .card h2 { font-size: 1rem; font-weight: 600; margin-bottom: 1rem; color: var(--accent); }
+    .options { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+    @media (max-width: 640px) { .options { grid-template-columns: 1fr; } }
     .option {
-      border: 2px solid var(--border);
-      border-radius: var(--radius);
-      padding: 1rem;
-      cursor: pointer;
-      transition: border-color 0.15s, background 0.15s;
+      border: 2px solid var(--border); border-radius: var(--radius);
+      padding: 1rem; cursor: pointer; transition: border-color 0.15s, background 0.15s;
     }
-
     .option:hover { border-color: var(--accent-dim); }
     .option.active {
-      border-color: var(--accent);
-      background: rgba(56, 189, 248, 0.08);
+      border-color: var(--accent); background: rgba(56, 189, 248, 0.08);
     }
-
-    .option h3 { font-size: 0.95rem; margin-bottom: 0.25rem; }
+    .option h3 { font-size: 0.95rem; margin-bottom: 0.3rem; }
     .option p { font-size: 0.8rem; color: var(--muted); }
-
-    .input-row {
-      display: flex;
-      gap: 0.75rem;
-      margin-top: 0.75rem;
-      flex-wrap: wrap;
+    .input-row { display: flex; gap: 0.75rem; margin-top: 0.75rem; flex-wrap: wrap; }
+    input[type="text"] {
+      flex: 1; min-width: 200px; background: var(--bg); border: 1px solid var(--border);
+      color: var(--text); padding: 0.6rem 0.9rem; border-radius: 8px; font-size: 0.9rem;
     }
-
-    input[type="text"], select {
-      flex: 1;
-      min-width: 180px;
-      background: var(--bg);
-      border: 1px solid var(--border);
-      color: var(--text);
-      padding: 0.6rem 0.9rem;
-      border-radius: 8px;
-      font-size: 0.9rem;
-    }
-
-    input:focus, select:focus { outline: none; border-color: var(--accent); }
-
+    input:focus { outline: none; border-color: var(--accent); }
     button {
-      background: var(--accent);
-      color: #0f172a;
-      border: none;
-      padding: 0.6rem 1.25rem;
-      border-radius: 8px;
-      font-weight: 600;
-      font-size: 0.9rem;
-      cursor: pointer;
-      transition: background 0.15s;
+      background: var(--accent); color: #0f172a; border: none;
+      padding: 0.6rem 1.2rem; border-radius: 8px; font-weight: 600;
+      font-size: 0.9rem; cursor: pointer;
     }
-
     button:hover { background: var(--accent-dim); }
-    button:disabled { opacity: 0.5; cursor: not-allowed; }
-
     button.secondary {
-      background: transparent;
-      border: 1px solid var(--border);
-      color: var(--text);
+      background: transparent; border: 1px solid var(--border); color: var(--text);
     }
-
     button.secondary:hover { border-color: var(--accent); color: var(--accent); }
-
-    .steps {
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
+    .hint {
+      font-size: 0.8rem; color: var(--muted); margin-top: 0.85rem;
+      padding: 0.65rem 0.85rem; background: rgba(56, 189, 248, 0.06);
+      border-radius: 6px; border: 1px solid rgba(56, 189, 248, 0.15);
     }
-
-    .step {
-      display: grid;
-      grid-template-columns: 36px 1fr auto;
-      align-items: center;
-      gap: 0.75rem;
-      padding: 0.6rem 0.75rem;
-      border-radius: 8px;
-      background: var(--bg);
-      border: 1px solid transparent;
-      transition: border-color 0.2s, background 0.2s;
-    }
-
-    .step.active {
-      border-color: var(--accent);
-      background: rgba(56, 189, 248, 0.06);
-    }
-
-    .step.done { border-color: var(--success); }
-    .step.error { border-color: var(--error); }
-
-    .step-num {
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      background: var(--surface-2);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 0.8rem;
-      font-weight: 600;
-    }
-
-    .step.done .step-num { background: var(--success); color: #0f172a; }
-    .step.active .step-num { background: var(--accent); color: #0f172a; }
-    .step.error .step-num { background: var(--error); color: white; }
-
-    .step-title { font-size: 0.9rem; font-weight: 500; }
-    .step-status {
-      font-size: 0.75rem;
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: 0.03em;
-    }
-
-    .step.done .step-status { color: var(--success); }
-    .step.active .step-status { color: var(--accent); }
-    .step.error .step-status { color: var(--error); }
-
-    .progress-wrap {
-      height: 6px;
-      background: var(--bg);
-      border-radius: 999px;
-      overflow: hidden;
-      margin: 1rem 0 0.5rem;
-    }
-
-    .progress-bar {
-      height: 100%;
-      width: 0%;
-      background: linear-gradient(90deg, var(--accent), var(--success));
-      border-radius: 999px;
-      transition: width 0.4s ease;
-    }
-
-    .console {
-      background: #020617;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 0.75rem 1rem;
-      font-family: ui-monospace, "Cascadia Code", "Fira Code", monospace;
-      font-size: 0.78rem;
-      height: 220px;
-      overflow-y: auto;
-      color: #a5f3fc;
-      line-height: 1.45;
-    }
-
-    .console .info { color: #94a3b8; }
-    .console .ok { color: #4ade80; }
-    .console .warn { color: #fbbf24; }
-    .console .err { color: #f87171; }
-    .console .cmd { color: #38bdf8; }
-
-    .table-wrap {
-      overflow-x: auto;
-      border-radius: 8px;
-      border: 1px solid var(--border);
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.8rem;
-    }
-
-    th, td {
-      padding: 0.5rem 0.75rem;
-      text-align: left;
-      border-bottom: 1px solid var(--border);
-    }
-
-    th {
-      background: var(--bg);
-      color: var(--muted);
-      font-weight: 600;
-      white-space: nowrap;
-    }
-
-    tr:last-child td { border-bottom: none; }
-    tr:hover td { background: rgba(56, 189, 248, 0.04); }
-
-    .tabs {
-      display: flex;
-      gap: 0.4rem;
-      margin-bottom: 1rem;
-      border-bottom: 1px solid var(--border);
-      padding-bottom: 0.5rem;
-      flex-wrap: wrap;
-    }
-
-    .tab {
-      background: transparent;
-      border: none;
-      color: var(--muted);
-      padding: 0.4rem 0.8rem;
-      border-radius: 6px;
-      font-size: 0.82rem;
-      font-weight: 500;
-      cursor: pointer;
-    }
-
-    .tab.active {
-      background: rgba(56, 189, 248, 0.15);
-      color: var(--accent);
-    }
-
-    .tab:hover { color: var(--text); }
-
-    .report-frame {
-      width: 100%;
-      height: 620px;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      background: #fff;
-    }
-
-    .report-toolbar {
-      display: flex;
-      gap: 0.75rem;
-      align-items: center;
-      margin-bottom: 0.75rem;
-      flex-wrap: wrap;
-    }
-
-    .report-toolbar label {
-      font-size: 0.8rem;
-      color: var(--muted);
-    }
-
-    .stats-box {
-      background: #020617;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 1rem 1.25rem;
-      font-family: ui-monospace, "Cascadia Code", monospace;
-      font-size: 0.82rem;
-      line-height: 1.55;
-      color: #e2e8f0;
-      white-space: pre-wrap;
-      max-height: 480px;
-      overflow-y: auto;
-    }
-
-    /* Info panels for SRA + Reference */
-    .info-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1rem;
-    }
-
-    @media (max-width: 800px) {
-      .info-grid { grid-template-columns: 1fr; }
-    }
-
+    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    @media (max-width: 800px) { .info-grid { grid-template-columns: 1fr; } }
     .info-panel {
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 1rem;
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 8px; padding: 1rem;
     }
-
     .info-panel h3 {
-      font-size: 0.9rem;
-      color: var(--accent);
-      margin-bottom: 0.75rem;
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
+      font-size: 0.9rem; color: var(--accent); margin-bottom: 0.75rem;
+      display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;
     }
-
-    .info-table {
-      width: 100%;
-      font-size: 0.8rem;
-      border-collapse: collapse;
-    }
-
+    .info-table { width: 100%; font-size: 0.8rem; border-collapse: collapse; }
     .info-table td {
-      padding: 0.35rem 0.4rem;
-      border-bottom: 1px solid rgba(71, 85, 105, 0.5);
+      padding: 0.35rem 0.4rem; border-bottom: 1px solid rgba(71, 85, 105, 0.5);
       vertical-align: top;
     }
-
-    .info-table td:first-child {
-      color: var(--muted);
-      width: 42%;
-      white-space: nowrap;
-    }
-
-    .info-table td:last-child {
-      color: var(--text);
-      word-break: break-word;
-    }
-
+    .info-table td:first-child { color: var(--muted); width: 38%; white-space: nowrap; }
+    .info-table td:last-child { color: var(--text); word-break: break-word; }
     .info-table tr:last-child td { border-bottom: none; }
-
     .badge-sm {
-      display: inline-block;
-      font-size: 0.65rem;
-      font-weight: 700;
-      padding: 0.1rem 0.4rem;
-      border-radius: 999px;
-      background: rgba(56, 189, 248, 0.2);
-      color: var(--accent);
+      display: inline-block; font-size: 0.65rem; font-weight: 700;
+      padding: 0.1rem 0.4rem; border-radius: 999px;
+      background: rgba(56, 189, 248, 0.2); color: var(--accent);
     }
-
-    .loading-text {
-      color: var(--muted);
-      font-size: 0.85rem;
-      font-style: italic;
-    }
-
-    .link-out {
-      color: var(--accent);
-      text-decoration: none;
-    }
+    .badge-ok { background: rgba(34, 197, 94, 0.2); color: var(--success); }
+    .badge-warn { background: rgba(245, 158, 11, 0.2); color: var(--warning); }
+    .loading-text { color: var(--muted); font-size: 0.85rem; font-style: italic; }
+    .link-out { color: var(--accent); text-decoration: none; }
     .link-out:hover { text-decoration: underline; }
-
+    .note-box {
+      margin-top: 0.75rem; padding: 0.6rem 0.8rem; border-radius: 6px;
+      font-size: 0.78rem; background: rgba(56, 189, 248, 0.08);
+      border: 1px solid rgba(56, 189, 248, 0.25); color: var(--muted);
+    }
+    .note-box.warn {
+      background: rgba(245, 158, 11, 0.08); border-color: rgba(245, 158, 11, 0.3);
+    }
     .hidden { display: none !important; }
-
+    .next-box {
+      margin-top: 1rem; padding: 1rem; border-radius: 8px;
+      border: 1px dashed var(--border); font-size: 0.85rem; color: var(--muted);
+    }
+    .next-box code {
+      background: var(--bg); padding: 0.15rem 0.4rem; border-radius: 4px;
+      font-size: 0.8rem; color: #67e8f9;
+    }
     footer {
-      text-align: center;
-      padding: 1rem;
-      font-size: 0.75rem;
-      color: var(--muted);
-      border-top: 1px solid var(--border);
+      text-align: center; padding: 1rem; font-size: 0.75rem;
+      color: var(--muted); border-top: 1px solid var(--border);
     }
-
-    .meta {
-      display: flex;
-      gap: 1.5rem;
-      flex-wrap: wrap;
-      font-size: 0.8rem;
-      color: var(--muted);
-      margin-top: 0.75rem;
-    }
-
-    .meta span strong { color: var(--text); }
   </style>
 </head>
 <body>
   <header>
-    <h1>
-      NGS Variant Calling
-      <span class="badge">Interactive</span>
-    </h1>
-    <div style="font-size:0.8rem;color:var(--muted)">
-      v2.7 · Practical · High-performance
-    </div>
+    <h1>NGS Variant Calling</h1>
+    <div class="sub">Sample &amp; reference explorer · pairs with <code>run_interactive_pipeline.py</code></div>
   </header>
 
   <div class="container">
-    <!-- Selection -->
     <div class="card" id="selectionCard">
       <h2>1. Choose Data Source</h2>
       <div class="options">
         <div class="option active" data-mode="sra" id="optSra">
           <h3>Option 1 · NCBI SRA</h3>
-          <p>Download reads by SRR accession. Fetches live metadata from NCBI/ENA.</p>
+          <p>Enter an SRR / ERR / DRR accession. Live metadata from ENA; recommended reference from NCBI.</p>
         </div>
         <div class="option" data-mode="local" id="optLocal">
           <h3>Option 2 · Local FASTQ</h3>
-          <p>Use your own paired-end FASTQ files (input_1 / input_2)</p>
+          <p>Use your own paired files as <code>data/run_*/input_1.fastq</code> and <code>input_2.fastq</code> (handled by the Python pipeline).</p>
         </div>
       </div>
 
       <div class="input-row" id="sraInputRow">
-        <input type="text" id="srrInput" placeholder="SRR1553607 (press Enter for default)" />
-        <button id="startBtn">Start Pipeline</button>
+        <input type="text" id="srrInput" placeholder="e.g. SRR1553607, SRR39418081, SRR2584857" />
+        <button id="lookupBtn">Lookup sample &amp; reference</button>
       </div>
 
       <div class="input-row hidden" id="localInputRow">
-        <input type="text" id="localPath" placeholder="Path to folder containing input_1.fastq & input_2.fastq" />
-        <button id="startLocalBtn">Start with Local Files</button>
+        <button id="localInfoBtn" class="secondary">Show local-mode reference info</button>
+      </div>
+
+      <div class="hint">
+        This page looks up <strong>input sequencing data</strong> and a <strong>recommended reference genome</strong>.
+        Real alignment (BWA) and variant calling run via
+        <code>python run_interactive_pipeline.py</code>
+        or GitHub Actions — not inside the browser.
       </div>
     </div>
 
-    <!-- Comprehensive Info Panels (SRA + Reference) -->
     <div class="card hidden" id="infoCard">
-      <h2>Sample &amp; Reference Information</h2>
+      <h2>2. Input data &amp; reference</h2>
       <div class="info-grid">
-        <!-- Input Data Panel -->
-        <div class="info-panel" id="sraInfoPanel">
+        <div class="info-panel">
           <h3>
-            <span>📥</span> Input Sequencing Data
-            <span class="badge-sm">NCBI SRA / ENA</span>
+            Input sequencing data
+            <span class="badge-sm">Live ENA / NCBI</span>
           </h3>
-          <div id="sraInfoContent" class="loading-text">Fetching metadata from NCBI/ENA…</div>
+          <div id="sraInfoContent" class="loading-text">Waiting for accession…</div>
         </div>
-
-        <!-- Reference Panel -->
-        <div class="info-panel" id="refInfoPanel">
+        <div class="info-panel">
           <h3>
-            <span>🧬</span> Reference Genome
-            <span class="badge-sm">Fixed</span>
+            Recommended reference
+            <span class="badge-sm" id="refBadge">Pending</span>
           </h3>
-          <div id="refInfoContent"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Pipeline Progress -->
-    <div class="card hidden" id="progressCard">
-      <h2>2. Pipeline Execution</h2>
-      <div class="progress-wrap">
-        <div class="progress-bar" id="progressBar"></div>
-      </div>
-      <div class="meta" id="runMeta">
-        <span>Run ID: <strong id="runId">—</strong></span>
-        <span>Sample: <strong id="sampleId">—</strong></span>
-        <span>Mode: <strong id="runMode">—</strong></span>
-      </div>
-      <div class="steps" id="stepsList" style="margin-top:1rem"></div>
-    </div>
-
-    <!-- Live Log -->
-    <div class="card hidden" id="logCard">
-      <h2>3. Live Log</h2>
-      <div class="console" id="console"></div>
-    </div>
-
-    <!-- Results -->
-    <div class="card hidden" id="resultsCard">
-      <h2>4. Analysis Report</h2>
-
-      <div class="tabs">
-        <button class="tab active" data-tab="variants">Variants Table</button>
-        <button class="tab" data-tab="fastp">QC Report (fastp)</button>
-        <button class="tab" data-tab="snpeff">SnpEff Summary</button>
-        <button class="tab" data-tab="alignment">Alignment Stats</button>
-      </div>
-
-      <!-- Variants -->
-      <div id="panel-variants">
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>CHROM</th><th>POS</th><th>REF</th><th>ALT</th><th>QUAL</th>
-                <th>DP</th><th>AC</th><th>MQ</th><th>VDB</th><th>SGB</th>
-              </tr>
-            </thead>
-            <tbody id="variantsBody"></tbody>
-          </table>
-        </div>
-        <div class="meta" style="margin-top:0.75rem">
-          <span>High-quality variants: <strong id="varCount">0</strong></span>
-          <span>Filter: DP ≥ 15 · QUAL > 30</span>
+          <div id="refInfoContent" class="loading-text">Determined from sample organism…</div>
         </div>
       </div>
 
-      <!-- fastp -->
-      <div id="panel-fastp" class="hidden">
-        <div class="report-toolbar">
-          <label for="runSelect">Select previous run:</label>
-          <select id="runSelect">
-            <option value="results/run_20260703_011117/fastp.html">run_20260703_011117 (SRR39418081)</option>
-            <option value="results/run_20260702_200649/fastp.html">run_20260702_200649 (SRR1553607)</option>
-            <option value="results/run_20260703_021247/fastp.html">run_20260703_021247 (SRR39418081)</option>
-          </select>
-          <button class="secondary" id="openFastpBtn" style="padding:0.45rem 0.9rem">Open in new tab</button>
-        </div>
-        <iframe id="fastpFrame" class="report-frame" src="results/run_20260703_011117/fastp.html" title="fastp QC Report"></iframe>
-        <div class="meta" style="margin-top:0.5rem">
-          <span>Source: <strong id="fastpSource">results/run_20260703_011117/fastp.html</strong></span>
-        </div>
-      </div>
-
-      <!-- SnpEff -->
-      <div id="panel-snpeff" class="hidden">
-        <div class="report-toolbar">
-          <button class="secondary" id="openSnpeffBtn" style="padding:0.45rem 0.9rem">Open SnpEff Summary in new tab</button>
-        </div>
-        <iframe id="snpeffFrame" class="report-frame" src="snpEff_summary.html" title="SnpEff Summary"></iframe>
-        <div class="meta" style="margin-top:0.5rem">
-          <span>Source: <strong>snpEff_summary.html</strong></span>
-        </div>
-      </div>
-
-      <!-- Alignment Stats -->
-      <div id="panel-alignment" class="hidden">
-        <div class="report-toolbar">
-          <label for="alignSelect">Select previous run:</label>
-          <select id="alignSelect">
-            <option value="results/run_20260703_011117/alignment_stats.txt">run_20260703_011117</option>
-            <option value="results/run_20260702_200649/alignment_stats.txt">run_20260702_200649</option>
-            <option value="results/run_20260702_193725/alignment_stats.txt">run_20260702_193725</option>
-          </select>
-        </div>
-        <div class="stats-box" id="alignStatsBox">Loading alignment statistics…</div>
-        <div class="meta" style="margin-top:0.5rem">
-          <span>Source: <strong id="alignSource">results/run_20260703_011117/alignment_stats.txt</strong></span>
-        </div>
-      </div>
-
-      <div style="margin-top:1.25rem;display:flex;gap:0.75rem;flex-wrap:wrap">
-        <button class="secondary" id="resetBtn">New Run</button>
-        <button class="secondary" id="downloadLogBtn">Download Log</button>
+      <div class="next-box" id="nextBox">
+        <strong>Next (real analysis)</strong><br /><br />
+        In this folder tree (<code>data/</code>, <code>ref/</code>, <code>results/</code>, <code>logs/</code>):
+        <br /><br />
+        <code>python run_interactive_pipeline.py</code>
+        <br /><br />
+        Choose the same option (1 = SRA with this accession, 2 = local FASTQ).
+        Reference files live under <code>ref/</code> (e.g. <code>ecoli.fna</code> + BWA index).
+        Outputs go to <code>results/run_*</code> and <code>logs/</code>.
       </div>
     </div>
   </div>
 
   <footer>
-    Interactive frontend for <code>run_interactive_pipeline.py</code> · Low-complexity · Vanilla JS · Practical architecture
+    Tree: data · ref · results · logs · run_interactive_pipeline.py · Live metadata only in browser
   </footer>
 
   <script>
-    const state = { mode: "sra", sampleId: "SRR1553607", runId: "", running: false };
-
-    const STEPS = [
-      { id: 1, title: "Setup Directories", desc: "Create isolated run folders" },
-      { id: 2, title: "Reference Genome", desc: "Download & index E. coli K-12" },
-      { id: 3, title: "Index Verification", desc: "Confirm BWA/samtools indices" },
-      { id: 4, title: "Data Input", desc: "Download SRA or load local FASTQ" },
-      { id: 5, title: "fastp QC + Trim", desc: "Quality control → fastp.html" },
-      { id: 6, title: "Align Reads", desc: "BWA-MEM → BAM → alignment_stats.txt" },
-      { id: 7, title: "Call Variants", desc: "bcftools → VCF" },
-      { id: 8, title: "Annotate Variants", desc: "SnpEff → snpEff_summary.html" }
+    const REF_MAP = [
+      { match: [/escherichia coli/i, /e\.?\s*coli/i], taxIds: ["562"], accession: "NC_000913.3" },
+      { match: [/salmonella enterica/i, /salmonella typhimurium/i], taxIds: ["28901", "90371"], accession: "NC_003197.2" },
+      { match: [/staphylococcus aureus/i], taxIds: ["1280"], accession: "NC_007795.1" },
+      { match: [/mycobacterium tuberculosis/i], taxIds: ["1773"], accession: "NC_000962.3" },
+      { match: [/homo sapiens/i, /human/i], taxIds: ["9606"], accession: "GCF_000001405.40" },
+      { match: [/mus musculus/i, /mouse/i], taxIds: ["10090"], accession: "GCF_000001635.27" }
     ];
+    const PIPELINE_REF = "NC_000913.3";
 
-    const MOCK_VARIANTS = [
-      { chrom: "NC_000913.3", pos: 58,    ref: "G",  alt: "C", qual: 225.4, dp: 60, ac: 2, mq: 60, vdb: 0.58, sgb: -0.69 },
-      { chrom: "NC_000913.3", pos: 1487,  ref: "A",  alt: "G", qual: 198.2, dp: 48, ac: 2, mq: 60, vdb: 0.41, sgb: -0.65 },
-      { chrom: "NC_000913.3", pos: 3521,  ref: "T",  alt: "C", qual: 312.1, dp: 72, ac: 2, mq: 60, vdb: 0.72, sgb: -0.71 },
-      { chrom: "NC_000913.3", pos: 8910,  ref: "C",  alt: "T", qual: 156.8, dp: 35, ac: 1, mq: 58, vdb: 0.33, sgb: -0.55 },
-      { chrom: "NC_000913.3", pos: 12455, ref: "G",  alt: "A", qual: 287.3, dp: 55, ac: 2, mq: 60, vdb: 0.61, sgb: -0.68 },
-      { chrom: "NC_000913.3", pos: 27801, ref: "AT", alt: "A", qual: 142.0, dp: 29, ac: 1, mq: 55, vdb: 0.29, sgb: -0.48 }
-    ];
-
-    const FALLBACK_STATS = `224562 + 0 in total (QC-passed reads + QC-failed reads)
-0 + 0 secondary
-0 + 0 supplementary
-0 + 0 duplicates
-221654 + 0 mapped (98.70% : N/A)
-224562 + 0 paired in sequencing
-112281 + 0 read1
-112281 + 0 read2
-218890 + 0 properly paired (97.47% : N/A)
-221120 + 0 with itself and mate mapped
-534 + 0 singletons (0.24% : N/A)
-0 + 0 with mate mapped to a different chr
-0 + 0 with mate mapped to a different chr (mapQ>=5)`;
-
-    // Comprehensive Reference Genome info (always the same in this pipeline)
-    const REFERENCE_INFO = {
-      organism: "Escherichia coli str. K-12 substr. MG1655",
-      accession: "NC_000913.3",
-      assembly: "ASM584v2 (GCF_000005845.2)",
-      length: "4,641,652 bp",
-      gc: "50.79%",
-      genes: "~4,500 protein-coding genes",
-      topology: "Circular chromosome",
-      source: "NCBI RefSeq",
-      download: "ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/005/845/...",
-      description: "The classic laboratory strain of E. coli. Widely used as the standard reference for bacterial genomics and variant calling demonstrations."
-    };
-
+    const state = { mode: "sra" };
     const $ = id => document.getElementById(id);
-    const consoleEl = $("console");
-    const stepsList = $("stepsList");
-    const progressBar = $("progressBar");
 
-    function log(msg, cls = "info") {
-      const line = document.createElement("div");
-      line.className = cls;
-      line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
-      consoleEl.appendChild(line);
-      consoleEl.scrollTop = consoleEl.scrollHeight;
+    function suggestReference(scientificName, taxId) {
+      const name = (scientificName || "").toLowerCase();
+      const tid = String(taxId || "");
+      for (const entry of REF_MAP) {
+        if (entry.taxIds.includes(tid)) return entry;
+        for (const re of entry.match) {
+          if (re.test(name)) return entry;
+        }
+      }
+      return null;
     }
 
-    function setProgress(pct) { progressBar.style.width = pct + "%"; }
-
-    function renderSteps() {
-      stepsList.innerHTML = STEPS.map(s => `
-        <div class="step" id="step-${s.id}">
-          <div class="step-num">${s.id}</div>
-          <div><div class="step-title">${s.title}</div></div>
-          <div class="step-status" id="status-${s.id}">pending</div>
-        </div>`).join("");
+    async function fetchReferenceMetadata(accession) {
+      const url =
+        "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=nucleotide&id=" +
+        encodeURIComponent(accession) + "&retmode=json";
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const json = await res.json();
+        const uids = (json.result && json.result.uids) || [];
+        if (!uids.length) throw new Error("No UID");
+        const rec = json.result[uids[0]] || {};
+        return {
+          accession,
+          title: rec.title || rec.caption || accession,
+          length: rec.length ? Number(rec.length).toLocaleString() + " bp" : "—",
+          taxid: rec.taxid || "—",
+          source: rec.source || "—"
+        };
+      } catch (err) {
+        return {
+          accession,
+          title: accession,
+          length: "—",
+          taxid: "—",
+          source: "—",
+          extra: "Could not reach NCBI (network/CORS). Showing accession only."
+        };
+      }
     }
 
-    function updateStep(id, status) {
-      const el = $(`step-${id}`);
-      const st = $(`status-${id}`);
-      el.classList.remove("active", "done", "error");
-      if (status === "running") { el.classList.add("active"); st.textContent = "running"; }
-      else if (status === "done") { el.classList.add("done"); st.textContent = "done"; }
-      else if (status === "error") { el.classList.add("error"); st.textContent = "error"; }
+    async function renderReferencePanel(suggested, scientificName, taxId) {
+      const badge = $("refBadge");
+      const content = $("refInfoContent");
+
+      if (!suggested) {
+        badge.textContent = "Unknown";
+        badge.className = "badge-sm badge-warn";
+        content.innerHTML =
+          '<table class="info-table">' +
+          "<tr><td>Detected organism</td><td>" + (scientificName || "—") + "</td></tr>" +
+          "<tr><td>Taxonomy ID</td><td>" + (taxId || "—") + "</td></tr>" +
+          "<tr><td>Status</td><td>No curated accession in map</td></tr>" +
+          '<tr><td>Action</td><td><a class="link-out" href="https://www.ncbi.nlm.nih.gov/assembly/?term=' +
+          encodeURIComponent(scientificName || "") +
+          '" target="_blank">Search NCBI Assembly</a></td></tr>' +
+          "</table>" +
+          '<div class="note-box warn">This project ships <code>ref/ecoli.fna</code> (E. coli K-12). For other organisms, download a matching FASTA into <code>ref/</code> and update the pipeline.</div>';
+        return;
+      }
+
+      badge.textContent = "Loading…";
+      badge.className = "badge-sm";
+      content.innerHTML =
+        '<span class="loading-text">Fetching live metadata for <strong>' +
+        suggested.accession +
+        "</strong> from NCBI…</span>";
+
+      const meta = await fetchReferenceMetadata(suggested.accession);
+      const isEcoli =
+        suggested.accession === PIPELINE_REF ||
+        /escherichia coli/i.test(meta.title || "");
+
+      badge.textContent = "Live NCBI";
+      badge.className = "badge-sm badge-ok";
+
+      content.innerHTML =
+        '<table class="info-table">' +
+        "<tr><td>Title</td><td>" + meta.title + "</td></tr>" +
+        '<tr><td>Accession</td><td><a class="link-out" href="https://www.ncbi.nlm.nih.gov/nuccore/' +
+        meta.accession + '" target="_blank">' + meta.accession + "</a></td></tr>" +
+        "<tr><td>Length</td><td>" + meta.length + "</td></tr>" +
+        "<tr><td>Taxonomy ID</td><td>" + meta.taxid + "</td></tr>" +
+        "<tr><td>Source</td><td>" + meta.source + "</td></tr>" +
+        '<tr><td>Local project file</td><td><code>ref/ecoli.fna</code> (+ BWA index files)</td></tr>' +
+        '<tr><td>Links</td><td>' +
+        '<a class="link-out" href="https://www.ncbi.nlm.nih.gov/nuccore/' + meta.accession +
+        '" target="_blank">Nucleotide</a> · ' +
+        '<a class="link-out" href="https://www.ncbi.nlm.nih.gov/assembly/?term=' +
+        encodeURIComponent(scientificName || meta.title) +
+        '" target="_blank">Assembly</a></td></tr>' +
+        "</table>" +
+        '<div class="note-box ' + (isEcoli ? "" : "warn") + '">' +
+        (isEcoli
+          ? "✅ Matches the reference used by <code>run_interactive_pipeline.py</code> (<code>ref/ecoli.fna</code> / NC_000913.3)."
+          : "⚠️ Pipeline is currently wired to <code>ref/ecoli.fna</code> (" +
+            PIPELINE_REF +
+            "). For this organism, replace/update the reference in the Python script.") +
+        "</div>";
     }
 
-    // ---------- Render Reference Info (always available) ----------
-    function renderReferenceInfo() {
-      const r = REFERENCE_INFO;
-      $("refInfoContent").innerHTML = `
-        <table class="info-table">
-          <tr><td>Organism</td><td>${r.organism}</td></tr>
-          <tr><td>Accession</td><td><a class="link-out" href="https://www.ncbi.nlm.nih.gov/nuccore/${r.accession}" target="_blank">${r.accession}</a></td></tr>
-          <tr><td>Assembly</td><td>${r.assembly}</td></tr>
-          <tr><td>Length</td><td>${r.length}</td></tr>
-          <tr><td>GC Content</td><td>${r.gc}</td></tr>
-          <tr><td>Genes</td><td>${r.genes}</td></tr>
-          <tr><td>Topology</td><td>${r.topology}</td></tr>
-          <tr><td>Source</td><td>${r.source}</td></tr>
-          <tr><td>Description</td><td>${r.description}</td></tr>
-        </table>
-      `;
-    }
-
-    // ---------- Fetch real SRA / ENA metadata ----------
     async function fetchSraMetadata(srr) {
       const content = $("sraInfoContent");
-      content.innerHTML = `<span class="loading-text">Connecting to ENA / NCBI for <strong>${srr}</strong>…</span>`;
+      content.innerHTML =
+        '<span class="loading-text">Connecting to ENA Portal for <strong>' +
+        srr +
+        "</strong>…</span>";
 
-      // ENA Portal API (CORS-friendly, excellent metadata)
       const fields = [
         "run_accession", "sample_accession", "experiment_accession", "study_accession",
-        "scientific_name", "tax_id", "library_strategy", "library_source", "library_selection",
-        "library_layout", "instrument_platform", "instrument_model",
-        "base_count", "read_count", "spot_count", "center_name", "first_public", "last_updated"
+        "scientific_name", "tax_id", "library_strategy", "library_source",
+        "library_selection", "library_layout", "instrument_platform", "instrument_model",
+        "base_count", "read_count", "spot_count", "center_name", "first_public"
       ].join(",");
 
-      const url = `https://www.ebi.ac.uk/ena/portal/api/filereport?accession=${encodeURIComponent(srr)}&result=read_run&fields=${fields}&format=json`;
+      const url =
+        "https://www.ebi.ac.uk/ena/portal/api/filereport?accession=" +
+        encodeURIComponent(srr) +
+        "&result=read_run&fields=" + fields + "&format=json";
 
       try {
         const res = await fetch(url);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        if (!res.ok) throw new Error("HTTP " + res.status);
         const data = await res.json();
-
-        if (!data || data.length === 0) {
-          throw new Error("No records returned");
-        }
+        if (!data || !data.length) throw new Error("No records");
 
         const rec = data[0];
         const bases = rec.base_count ? Number(rec.base_count).toLocaleString() : "—";
         const reads = rec.read_count ? Number(rec.read_count).toLocaleString() : "—";
-        const spots = rec.spot_count ? Number(rec.spot_count).toLocaleString() : "—";
 
-        content.innerHTML = `
-          <table class="info-table">
-            <tr><td>Run Accession</td><td><a class="link-out" href="https://www.ncbi.nlm.nih.gov/sra/${rec.run_accession}" target="_blank">${rec.run_accession || srr}</a></td></tr>
-            <tr><td>Sample</td><td>${rec.sample_accession || "—"}</td></tr>
-            <tr><td>Experiment</td><td>${rec.experiment_accession || "—"}</td></tr>
-            <tr><td>Study</td><td>${rec.study_accession || "—"}</td></tr>
-            <tr><td>Organism</td><td>${rec.scientific_name || "—"} (taxid ${rec.tax_id || "—"})</td></tr>
-            <tr><td>Library Strategy</td><td>${rec.library_strategy || "—"}</td></tr>
-            <tr><td>Library Source</td><td>${rec.library_source || "—"}</td></tr>
-            <tr><td>Library Selection</td><td>${rec.library_selection || "—"}</td></tr>
-            <tr><td>Library Layout</td><td>${rec.library_layout || "—"}</td></tr>
-            <tr><td>Platform</td><td>${rec.instrument_platform || "—"}</td></tr>
-            <tr><td>Instrument</td><td>${rec.instrument_model || "—"}</td></tr>
-            <tr><td>Total Bases</td><td>${bases}</td></tr>
-            <tr><td>Total Reads</td><td>${reads}</td></tr>
-            <tr><td>Spots</td><td>${spots}</td></tr>
-            <tr><td>Center</td><td>${rec.center_name || "—"}</td></tr>
-            <tr><td>First Public</td><td>${rec.first_public || "—"}</td></tr>
-            <tr><td>Last Updated</td><td>${rec.last_updated || "—"}</td></tr>
-            <tr><td>Links</td>
-              <td>
-                <a class="link-out" href="https://www.ncbi.nlm.nih.gov/sra/${srr}" target="_blank">NCBI SRA</a> ·
-                <a class="link-out" href="https://www.ebi.ac.uk/ena/browser/view/${srr}" target="_blank">ENA Browser</a>
-              </td>
-            </tr>
-          </table>
-        `;
-        log(`Successfully retrieved metadata for ${srr} from ENA/NCBI`, "ok");
-        return true;
+        content.innerHTML =
+          '<table class="info-table">' +
+          '<tr><td>Run</td><td><a class="link-out" href="https://www.ncbi.nlm.nih.gov/sra/' +
+          rec.run_accession + '" target="_blank">' + rec.run_accession + "</a></td></tr>" +
+          "<tr><td>Sample</td><td>" + (rec.sample_accession || "—") + "</td></tr>" +
+          "<tr><td>Experiment</td><td>" + (rec.experiment_accession || "—") + "</td></tr>" +
+          "<tr><td>Study</td><td>" + (rec.study_accession || "—") + "</td></tr>" +
+          "<tr><td>Organism</td><td><strong>" + (rec.scientific_name || "—") +
+          "</strong> (taxid " + (rec.tax_id || "—") + ")</td></tr>" +
+          "<tr><td>Strategy</td><td>" + (rec.library_strategy || "—") + "</td></tr>" +
+          "<tr><td>Source</td><td>" + (rec.library_source || "—") + "</td></tr>" +
+          "<tr><td>Layout</td><td>" + (rec.library_layout || "—") + "</td></tr>" +
+          "<tr><td>Platform</td><td>" + (rec.instrument_platform || "—") + " / " +
+          (rec.instrument_model || "—") + "</td></tr>" +
+          "<tr><td>Bases / Reads</td><td>" + bases + " / " + reads + "</td></tr>" +
+          "<tr><td>Center</td><td>" + (rec.center_name || "—") + "</td></tr>" +
+          "<tr><td>Public</td><td>" + (rec.first_public || "—") + "</td></tr>" +
+          '<tr><td>Links</td><td>' +
+          '<a class="link-out" href="https://www.ncbi.nlm.nih.gov/sra/' + srr +
+          '" target="_blank">NCBI SRA</a> · ' +
+          '<a class="link-out" href="https://www.ebi.ac.uk/ena/browser/view/' + srr +
+          '" target="_blank">ENA</a></td></tr>' +
+          "</table>" +
+          '<div class="note-box">Metadata only. FASTQ download happens in the Python pipeline via <code>fasterq-dump</code> into <code>data/run_*</code>.</div>';
+
+        const suggested = suggestReference(rec.scientific_name, rec.tax_id);
+        await renderReferencePanel(suggested, rec.scientific_name, rec.tax_id);
+
+        $("nextBox").innerHTML =
+          "<strong>Next (real analysis)</strong><br /><br />" +
+          "Run in this project folder:<br /><br />" +
+          "<code>python run_interactive_pipeline.py</code><br /><br />" +
+          "Option <strong>1</strong> → enter accession <strong>" + srr + "</strong><br /><br />" +
+          "Outputs: <code>results/run_*</code>, <code>logs/pipeline_" + srr + "_*.log</code>";
       } catch (err) {
-        console.warn("ENA fetch failed:", err);
-        // Fallback static info for known demo accessions
-        const fallback = getFallbackSraInfo(srr);
-        content.innerHTML = `
-          <table class="info-table">
-            ${fallback}
-            <tr><td colspan="2" style="color:var(--warning);font-size:0.75rem;padding-top:0.5rem">
-              Live fetch unavailable (CORS / network). Showing cached information.
-            </td></tr>
-          </table>
-        `;
-        log(`Could not reach ENA API – using fallback metadata for ${srr}`, "warn");
-        return false;
+        content.innerHTML =
+          '<table class="info-table">' +
+          "<tr><td>Accession</td><td>" + srr + "</td></tr>" +
+          '<tr><td>Status</td><td style="color:var(--warning)">Could not reach ENA API</td></tr>' +
+          '<tr><td>Action</td><td><a class="link-out" href="https://www.ncbi.nlm.nih.gov/sra/?term=' +
+          encodeURIComponent(srr) +
+          '" target="_blank">Search NCBI SRA</a></td></tr>' +
+          "</table>";
+        await renderReferencePanel(null, null, null);
       }
     }
 
-    function getFallbackSraInfo(srr) {
-      // Known demo samples used in this project
-      const known = {
-        "SRR1553607": {
-          organism: "Escherichia coli",
-          strategy: "WGS",
-          layout: "PAIRED",
-          platform: "ILLUMINA",
-          model: "Illumina HiSeq 2000",
-          note: "Classic E. coli demonstration dataset"
-        },
-        "SRR39418081": {
-          organism: "Escherichia coli",
-          strategy: "WGS",
-          layout: "PAIRED",
-          platform: "ILLUMINA",
-          model: "Illumina",
-          note: "Project demonstration run"
-        }
-      };
-
-      const k = known[srr] || {
-        organism: "Unknown (fetch failed)",
-        strategy: "—", layout: "—", platform: "—", model: "—", note: "Metadata not available offline"
-      };
-
-      return `
-        <tr><td>Run Accession</td><td><a class="link-out" href="https://www.ncbi.nlm.nih.gov/sra/${srr}" target="_blank">${srr}</a></td></tr>
-        <tr><td>Organism</td><td>${k.organism}</td></tr>
-        <tr><td>Library Strategy</td><td>${k.strategy}</td></tr>
-        <tr><td>Library Layout</td><td>${k.layout}</td></tr>
-        <tr><td>Platform</td><td>${k.platform}</td></tr>
-        <tr><td>Instrument</td><td>${k.model}</td></tr>
-        <tr><td>Note</td><td>${k.note}</td></tr>
-        <tr><td>Links</td>
-          <td>
-            <a class="link-out" href="https://www.ncbi.nlm.nih.gov/sra/${srr}" target="_blank">NCBI SRA</a> ·
-            <a class="link-out" href="https://www.ebi.ac.uk/ena/browser/view/${srr}" target="_blank">ENA Browser</a>
-          </td>
-        </tr>
-      `;
-    }
-
-    // ---------- Mode selection ----------
-    document.querySelectorAll(".option").forEach(opt => {
-      opt.addEventListener("click", () => {
-        document.querySelectorAll(".option").forEach(o => o.classList.remove("active"));
+    document.querySelectorAll(".option").forEach(function (opt) {
+      opt.addEventListener("click", function () {
+        document.querySelectorAll(".option").forEach(function (o) {
+          o.classList.remove("active");
+        });
         opt.classList.add("active");
         state.mode = opt.dataset.mode;
         $("sraInputRow").classList.toggle("hidden", state.mode !== "sra");
@@ -827,157 +390,35 @@
       });
     });
 
-    // ---------- Tabs ----------
-    document.querySelectorAll(".tab").forEach(tab => {
-      tab.addEventListener("click", () => {
-        document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
-        tab.classList.add("active");
-        const target = tab.dataset.tab;
-        $("panel-variants").classList.toggle("hidden", target !== "variants");
-        $("panel-fastp").classList.toggle("hidden", target !== "fastp");
-        $("panel-snpeff").classList.toggle("hidden", target !== "snpeff");
-        $("panel-alignment").classList.toggle("hidden", target !== "alignment");
-        if (target === "alignment") loadAlignmentStats($("alignSelect").value);
-      });
-    });
-
-    $("runSelect").addEventListener("change", e => {
-      $("fastpFrame").src = e.target.value;
-      $("fastpSource").textContent = e.target.value;
-    });
-
-    $("openFastpBtn").addEventListener("click", () => window.open($("fastpFrame").src, "_blank"));
-    $("openSnpeffBtn").addEventListener("click", () => window.open("snpEff_summary.html", "_blank"));
-
-    async function loadAlignmentStats(path) {
-      const box = $("alignStatsBox");
-      $("alignSource").textContent = path;
-      box.textContent = "Loading…";
-      try {
-        const res = await fetch(path);
-        if (!res.ok) throw new Error("not found");
-        const text = await res.text();
-        box.textContent = text.trim() || FALLBACK_STATS;
-      } catch {
-        box.textContent = FALLBACK_STATS + "\n\n(Note: place index.html inside ngs-variant-calling/ for live files)";
+    $("lookupBtn").addEventListener("click", async function () {
+      const srr = $("srrInput").value.trim();
+      if (!srr) {
+        alert("Enter an SRA / ENA accession (SRR / ERR / DRR)");
+        return;
       }
-    }
-
-    $("alignSelect").addEventListener("change", e => loadAlignmentStats(e.target.value));
-
-    async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
-
-    async function runPipeline() {
-      if (state.running) return;
-      state.running = true;
-
-      $("selectionCard").classList.add("hidden");
       $("infoCard").classList.remove("hidden");
-      $("progressCard").classList.remove("hidden");
-      $("logCard").classList.remove("hidden");
-      $("resultsCard").classList.add("hidden");
-      consoleEl.innerHTML = "";
-      renderSteps();
-      setProgress(0);
-
-      state.runId = new Date().toISOString().slice(0,19).replace(/[-:T]/g, "").slice(0,15);
-      $("runId").textContent = state.runId;
-      $("sampleId").textContent = state.sampleId;
-      $("runMode").textContent = state.mode === "sra" ? "NCBI SRA" : "Local FASTQ";
-
-      // Always show reference info
-      renderReferenceInfo();
-
-      // Fetch SRA metadata only for Option 1
-      if (state.mode === "sra") {
-        log(`Querying NCBI/ENA for comprehensive metadata of ${state.sampleId}…`, "cmd");
-        await fetchSraMetadata(state.sampleId);
-      } else {
-        $("sraInfoContent").innerHTML = `
-          <table class="info-table">
-            <tr><td>Mode</td><td>Local FASTQ files</td></tr>
-            <tr><td>Note</td><td>No remote SRA metadata – using user-supplied reads</td></tr>
-          </table>
-        `;
-      }
-
-      log(`Pipeline started | Run ID: ${state.runId} | Sample: ${state.sampleId}`, "cmd");
-
-      for (let i = 0; i < STEPS.length; i++) {
-        const step = STEPS[i];
-        updateStep(step.id, "running");
-        log(`Starting Step ${step.id}: ${step.title}`, "cmd");
-        log(step.desc, "info");
-        await sleep(600 + Math.random() * 900);
-
-        if (step.id === 5) log(`QC report → results/run_${state.runId}/fastp.html`, "ok");
-        if (step.id === 6) log("Alignment rate: 98.70% mapped", "ok");
-        if (step.id === 8) log("SnpEff summary → snpEff_summary.html", "ok");
-
-        updateStep(step.id, "done");
-        log(`Step ${step.id} completed successfully.`, "ok");
-        setProgress(((i + 1) / STEPS.length) * 100);
-      }
-
-      log("Pipeline finished successfully.", "ok");
-      showResults();
-      state.running = false;
-    }
-
-    function showResults() {
-      $("resultsCard").classList.remove("hidden");
-      $("variantsBody").innerHTML = MOCK_VARIANTS.map(v => `
-        <tr>
-          <td>${v.chrom}</td><td>${v.pos}</td><td>${v.ref}</td><td>${v.alt}</td>
-          <td>${v.qual.toFixed(1)}</td><td>${v.dp}</td><td>${v.ac}</td>
-          <td>${v.mq}</td><td>${v.vdb.toFixed(2)}</td><td>${v.sgb.toFixed(2)}</td>
-        </tr>`).join("");
-      $("varCount").textContent = MOCK_VARIANTS.length;
-
-      document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
-      document.querySelector('[data-tab="variants"]').classList.add("active");
-      $("panel-variants").classList.remove("hidden");
-      $("panel-fastp").classList.add("hidden");
-      $("panel-snpeff").classList.add("hidden");
-      $("panel-alignment").classList.add("hidden");
-    }
-
-    $("startBtn").addEventListener("click", () => {
-      state.sampleId = $("srrInput").value.trim() || "SRR1553607";
-      state.mode = "sra";
-      runPipeline();
+      await fetchSraMetadata(srr);
     });
 
-    $("startLocalBtn").addEventListener("click", () => {
-      state.sampleId = "local_fastq";
-      state.mode = "local";
-      runPipeline();
+    $("srrInput").addEventListener("keydown", function (e) {
+      if (e.key === "Enter") $("lookupBtn").click();
     });
 
-    $("srrInput").addEventListener("keydown", e => { if (e.key === "Enter") $("startBtn").click(); });
-
-    $("resetBtn").addEventListener("click", () => {
-      state.running = false;
-      $("selectionCard").classList.remove("hidden");
-      $("infoCard").classList.add("hidden");
-      $("progressCard").classList.add("hidden");
-      $("logCard").classList.add("hidden");
-      $("resultsCard").classList.add("hidden");
-      setProgress(0);
-      consoleEl.innerHTML = "";
+    $("localInfoBtn").addEventListener("click", async function () {
+      $("infoCard").classList.remove("hidden");
+      $("sraInfoContent").innerHTML =
+        '<table class="info-table">' +
+        "<tr><td>Mode</td><td>Local FASTQ</td></tr>" +
+        "<tr><td>Expected files</td><td><code>data/run_*/input_1.fastq</code><br /><code>data/run_*/input_2.fastq</code></td></tr>" +
+        "<tr><td>Created by</td><td>Pipeline Step 1 creates the run folder; place files before Step 4</td></tr>" +
+        "</table>" +
+        '<div class="note-box">No ENA lookup in local mode. Reference below is the project default.</div>';
+      await renderReferencePanel(REF_MAP[0], "Escherichia coli", "562");
+      $("nextBox").innerHTML =
+        "<strong>Next (real analysis)</strong><br /><br />" +
+        "<code>python run_interactive_pipeline.py</code><br /><br />" +
+        "Choose option <strong>2</strong>, then place paired FASTQs as instructed.";
     });
-
-    $("downloadLogBtn").addEventListener("click", () => {
-      const text = Array.from(consoleEl.children).map(el => el.textContent).join("\n");
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(new Blob([text], { type: "text/plain" }));
-      a.download = `pipeline_${state.sampleId}_${state.runId}.log`;
-      a.click();
-    });
-
-    // Initialize reference panel content (hidden until run)
-    renderReferenceInfo();
-    renderSteps();
   </script>
 </body>
 </html>
