@@ -228,34 +228,18 @@ $ </div>
     }
 
     function parseTerminalForPanels(fullLog) {
-      const inputMatch = fullLog.match(/\[INFO\] Fetching fastq files for (.+?) via (.+?)\.\.\./);
-      if (inputMatch) {
+      const inputBlock = fullLog.match(/=== INPUT FEED \((?:NCBI\/ENA|LOCAL)\) ===([\s\S]*?)=== END INPUT ===/);
+      if (inputBlock) {
         $("inputBadge").textContent = "Captured";
         $("inputBadge").className = "badge-sm badge-ok";
-        $("panelInput").innerHTML =
-          "Target accession: <strong>" + inputMatch[1] + "</strong><br>" +
-          "Downloader: <code>" + inputMatch[2] + "</code>" +
-          "<pre>Status: Paired FASTQs mapped for this run.</pre>";
+        $("panelInput").innerHTML = "<pre>" + inputBlock[1].trim() + "</pre>";
       }
 
-      const localMatch = fullLog.match(/\[INFO\] Using local FASTQ pair under (.+)/);
-      if (localMatch) {
-        $("inputBadge").textContent = "Local";
-        $("inputBadge").className = "badge-sm badge-ok";
-        $("panelInput").innerHTML =
-          "Mode: <strong>Local FASTQ</strong><br>" +
-          "Path hint: <code>" + localMatch[1] + "</code>" +
-          "<pre>input_1.fastq + input_2.fastq</pre>";
-      }
-
-      const refMatch = fullLog.match(/\[INFO\] Aligning reads against (.+?) using (.+?)\.\.\./);
-      if (refMatch) {
+      const refBlock = fullLog.match(/=== REFERENCE GENOME \(DYNAMIC\) ===([\s\S]*?)=== END REFERENCE ===/);
+      if (refBlock) {
         $("refBadge").textContent = "Indexed";
         $("refBadge").className = "badge-sm badge-ok";
-        $("panelRef").innerHTML =
-          "Reference File: <code>" + refMatch[1] + "</code><br>" +
-          "Aligner: <strong>" + refMatch[2] + "</strong>" +
-          "<pre>Index status: BWA index verified &amp; ready.</pre>";
+        $("panelRef").innerHTML = "<pre>" + refBlock[1].trim() + "</pre>";
       }
 
       const resMatch = fullLog.match(/\[SUCCESS\] Variants written to (.+)/);
