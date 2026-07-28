@@ -120,6 +120,7 @@
   </header>
 
   <div class="container">
+    <!-- ========== 1. Choose data source ========== -->
     <div class="card" id="selectionCard">
       <h2>1. Choose Data Source</h2>
       <div class="options">
@@ -150,6 +151,7 @@
       </div>
     </div>
 
+    <!-- ========== 2. Live panels ========== -->
     <div class="card hidden" id="infoCard">
       <h2>2. Input data &amp; reference</h2>
       <div class="info-grid">
@@ -187,6 +189,7 @@
   </footer>
 
   <script>
+    /* Minimal map: organism → primary accession (metadata fetched live from NCBI) */
     const REF_MAP = [
       { match: [/escherichia coli/i, /e\.?\s*coli/i], taxIds: ["562"], accession: "NC_000913.3" },
       { match: [/salmonella enterica/i, /salmonella typhimurium/i], taxIds: ["28901", "90371"], accession: "NC_003197.2" },
@@ -195,7 +198,7 @@
       { match: [/homo sapiens/i, /human/i], taxIds: ["9606"], accession: "GCF_000001405.40" },
       { match: [/mus musculus/i, /mouse/i], taxIds: ["10090"], accession: "GCF_000001635.27" }
     ];
-    const PIPELINE_REF = "NC_000913.3";
+    const PIPELINE_REF = "NC_000913.3"; // matches ref/ecoli.fna in this project
 
     const state = { mode: "sra" };
     const $ = id => document.getElementById(id);
@@ -302,82 +305,169 @@
         "</div>";
     }
 
-    async function fetchSraMetadata(srr) {
-      const content = $("sraInfoContent");
-      content.innerHTML =
-        '<span class="loading-text">Connecting to ENA Portal for <strong>' +
-        srr +
-        "</strong>…</span>";
+    function renderInputTable(rec, sourceLabel) {
+      const bases = rec.base_count ? Number(rec.base_count).toLocaleString() : "—";
+      const reads = rec.read_count ? Number(rec.read_count).toLocaleString() : "—";
+      const srr = rec.run_accession || "—";
+      return (
+        '<table class="info-table">' +
+        '<tr><td>Run</td><td><a class="link-out" href="https://www.ncbi.nlm.nih.gov/sra/' +
+        srr + '" target="_blank">' + srr + "</a></td></tr>" +
+        "<tr><td>Sample</td><td>" + (rec.sample_accession || "—") + "</td></tr>" +
+        "<tr><td>Experiment</td><td>" + (rec.experiment_accession || "—") + "</td></tr>" +
+        "<tr><td>Study</td><td>" + (rec.study_accession || "—") + "</td></tr>" +
+        "<tr><td>Organism</td><td><strong>" + (rec.scientific_name || "—") +
+        "</strong> (taxid " + (rec.tax_id || "—") + ")</td></tr>" +
+        "<tr><td>Strategy</td><td>" + (rec.library_strategy || "—") + "</td></tr>" +
+        "<tr><td>Source</td><td>" + (rec.library_source || "—") + "</td></tr>" +
+        "<tr><td>Layout</td><td>" + (rec.library_layout || "—") + "</td></tr>" +
+        "<tr><td>Platform</td><td>" + (rec.instrument_platform || "—") +
+        (rec.instrument_model ? " / " + rec.instrument_model : "") + "</td></tr>" +
+        "<tr><td>Bases / Reads</td><td>" + bases + " / " + reads + "</td></tr>" +
+        "<tr><td>Center</td><td>" + (rec.center_name || "—") + "</td></tr>" +
+        "<tr><td>Public</td><td>" + (rec.first_public || "—") + "</td></tr>" +
+        "<tr><td>Metadata source</td><td>" + (sourceLabel || "—") + "</td></tr>" +
+        '<tr><td>Links</td><td>' +
+        '<a class="link-out" href="https://www.ncbi.nlm.nih.gov/sra/' + srr +
+        '" target="_blank">NCBI SRA</a> · ' +
+        '<a class="link-out" href="https://www.ebi.ac.uk/ena/browser/view/' + srr +
+        '" target="_blank">ENA</a></td></tr>' +
+        "</table>" +
+        '<div class="note-box">Metadata only. FASTQ download happens in the Python pipeline via <code>fasterq-dump</code> into <code>data/run_*</code>.</div>'
+      );
+    }
 
+    async function fetchFromEna(srr) {
       const fields = [
         "run_accession", "sample_accession", "experiment_accession", "study_accession",
         "scientific_name", "tax_id", "library_strategy", "library_source",
         "library_selection", "library_layout", "instrument_platform", "instrument_model",
         "base_count", "read_count", "spot_count", "center_name", "first_public"
       ].join(",");
-
-      const url =
-        "https://www.ebi.ac.uk/ena/portal/api/filereport?accession=" +
-        encodeURIComponent(srr) +
-        "&result=read_run&fields=" + fields + "&format=json";
-
-      try {
-        const res = await fetch(url);
-        if (!res.ok) throw new Error("HTTP " + res.status);
+      const urls = [
+        "https://www.ebi.ac.uk/ena/portal/api/filereport?accession=" + encodeURIComponent(srr) +
+          "&result=read_run&fields=" + fields + "&format=json&download=true",
+        "https://www.ebi.ac.uk/ena/portal/api/search?result=read_run&query=run_accession%3D%22" +
+          encodeURIComponent(srr) + "%22&fields=" + fields + "&format=json&limit=1"
+      ];
+      for (const url of urls) {
+        const res = await fetch(url, { mode: "cors" });
+        if (!res.ok) continue;
         const data = await res.json();
-        if (!data || !data.length) throw new Error("No records");
+        if (Array.isArray(data) && data.length) return { rec: data[0], source: "ENA Portal API" };
+      }
+      throw new Error("ENA returned no data");
+    }
 
-        const rec = data[0];
-        const bases = rec.base_count ? Number(rec.base_count).toLocaleString() : "—";
-        const reads = rec.read_count ? Number(rec.read_count).toLocaleString() : "—";
+    async function fetchFromNcbiRuninfo(srr) {
+      const url =
+        "https://trace.ncbi.nlm.nih.gov/Traces/sra-db-info/runinfo?acc=" +
+        encodeURIComponent(srr);
+      let res = await fetch(url, { mode: "cors" }).catch(() => null);
+      if (!res || !res.ok) {
+        res = await fetch(
+          "https://trace.ncbi.nlm.nih.gov/Traces/sra/sra.cgi?save=efetch&db=sra&rettype=runinfo&term=" +
+            encodeURIComponent(srr),
+          { mode: "cors" }
+        );
+      }
+      if (!res.ok) throw new Error("NCBI runinfo HTTP " + res.status);
+      const text = await res.text();
+      const lines = text.trim().split(/\r?\n/).filter(Boolean);
+      if (lines.length < 2) throw new Error("NCBI runinfo empty");
+      const headers = lines[0].split(",");
+      const values = lines[1].split(",");
+      const row = {};
+      headers.forEach(function (h, i) {
+        row[h.trim()] = (values[i] || "").trim();
+      });
+      return {
+        rec: {
+          run_accession: row.Run || srr,
+          sample_accession: row.Sample || row.BioSample || "—",
+          experiment_accession: row.Experiment || "—",
+          study_accession: row.SRAStudy || row.BioProject || "—",
+          scientific_name: row.ScientificName || row.Organism || "—",
+          tax_id: row.TaxID || "—",
+          library_strategy: row.LibraryStrategy || "—",
+          library_source: row.LibrarySource || "—",
+          library_layout: row.LibraryLayout || "—",
+          instrument_platform: row.Platform || "—",
+          instrument_model: row.Model || "—",
+          base_count: row.bases || row.Bases || "",
+          read_count: row.spots || row.Spots || "",
+          center_name: row.CenterName || "—",
+          first_public: row.ReleaseDate || "—"
+        },
+        source: "NCBI SRA runinfo"
+      };
+    }
 
-        content.innerHTML =
-          '<table class="info-table">' +
-          '<tr><td>Run</td><td><a class="link-out" href="https://www.ncbi.nlm.nih.gov/sra/' +
-          rec.run_accession + '" target="_blank">' + rec.run_accession + "</a></td></tr>" +
-          "<tr><td>Sample</td><td>" + (rec.sample_accession || "—") + "</td></tr>" +
-          "<tr><td>Experiment</td><td>" + (rec.experiment_accession || "—") + "</td></tr>" +
-          "<tr><td>Study</td><td>" + (rec.study_accession || "—") + "</td></tr>" +
-          "<tr><td>Organism</td><td><strong>" + (rec.scientific_name || "—") +
-          "</strong> (taxid " + (rec.tax_id || "—") + ")</td></tr>" +
-          "<tr><td>Strategy</td><td>" + (rec.library_strategy || "—") + "</td></tr>" +
-          "<tr><td>Source</td><td>" + (rec.library_source || "—") + "</td></tr>" +
-          "<tr><td>Layout</td><td>" + (rec.library_layout || "—") + "</td></tr>" +
-          "<tr><td>Platform</td><td>" + (rec.instrument_platform || "—") + " / " +
-          (rec.instrument_model || "—") + "</td></tr>" +
-          "<tr><td>Bases / Reads</td><td>" + bases + " / " + reads + "</td></tr>" +
-          "<tr><td>Center</td><td>" + (rec.center_name || "—") + "</td></tr>" +
-          "<tr><td>Public</td><td>" + (rec.first_public || "—") + "</td></tr>" +
-          '<tr><td>Links</td><td>' +
-          '<a class="link-out" href="https://www.ncbi.nlm.nih.gov/sra/' + srr +
-          '" target="_blank">NCBI SRA</a> · ' +
-          '<a class="link-out" href="https://www.ebi.ac.uk/ena/browser/view/' + srr +
-          '" target="_blank">ENA</a></td></tr>' +
-          "</table>" +
-          '<div class="note-box">Metadata only. FASTQ download happens in the Python pipeline via <code>fasterq-dump</code> into <code>data/run_*</code>.</div>';
+    async function fetchSraMetadata(srr) {
+      const content = $("sraInfoContent");
+      content.innerHTML =
+        '<span class="loading-text">Looking up <strong>' + srr +
+        "</strong> (ENA, then NCBI)…</span>";
 
-        const suggested = suggestReference(rec.scientific_name, rec.tax_id);
-        await renderReferencePanel(suggested, rec.scientific_name, rec.tax_id);
-
-        $("nextBox").innerHTML =
-          "<strong>Next (real analysis)</strong><br /><br />" +
-          "Run in this project folder:<br /><br />" +
-          "<code>python run_interactive_pipeline.py</code><br /><br />" +
-          "Option <strong>1</strong> → enter accession <strong>" + srr + "</strong><br /><br />" +
-          "Outputs: <code>results/run_*</code>, <code>logs/pipeline_" + srr + "_*.log</code>";
-      } catch (err) {
+      if (location.protocol === "file:") {
         content.innerHTML =
           '<table class="info-table">' +
           "<tr><td>Accession</td><td>" + srr + "</td></tr>" +
-          '<tr><td>Status</td><td style="color:var(--warning)">Could not reach ENA API</td></tr>' +
-          '<tr><td>Action</td><td><a class="link-out" href="https://www.ncbi.nlm.nih.gov/sra/?term=' +
-          encodeURIComponent(srr) +
-          '" target="_blank">Search NCBI SRA</a></td></tr>' +
+          '<tr><td>Status</td><td style="color:var(--warning)">Opened as file:// — browser blocks API calls</td></tr>' +
+          "<tr><td>Fix</td><td>Serve the page over HTTP, or open on GitHub Pages</td></tr>" +
+          '<tr><td>Quick serve</td><td><code>python -m http.server 8080</code> then open <code>http://127.0.0.1:8080/index.html</code></td></tr>' +
+          '<tr><td>Manual</td><td><a class="link-out" href="https://www.ncbi.nlm.nih.gov/sra/?term=' +
+          encodeURIComponent(srr) + '" target="_blank">NCBI SRA</a> · ' +
+          '<a class="link-out" href="https://www.ebi.ac.uk/ena/browser/view/' +
+          encodeURIComponent(srr) + '" target="_blank">ENA</a></td></tr>' +
           "</table>";
         await renderReferencePanel(null, null, null);
+        return;
       }
+
+      let result = null;
+      let lastErr = null;
+      try {
+        result = await fetchFromEna(srr);
+      } catch (e) {
+        lastErr = e;
+        try {
+          result = await fetchFromNcbiRuninfo(srr);
+        } catch (e2) {
+          lastErr = e2;
+        }
+      }
+
+      if (!result) {
+        content.innerHTML =
+          '<table class="info-table">' +
+          "<tr><td>Accession</td><td>" + srr + "</td></tr>" +
+          '<tr><td>Status</td><td style="color:var(--warning)">Could not reach ENA or NCBI APIs</td></tr>' +
+          "<tr><td>Detail</td><td>" + String(lastErr && lastErr.message ? lastErr.message : lastErr) + "</td></tr>" +
+          '<tr><td>Open manually</td><td><a class="link-out" href="https://www.ncbi.nlm.nih.gov/sra/?term=' +
+          encodeURIComponent(srr) + '" target="_blank">NCBI SRA</a> · ' +
+          '<a class="link-out" href="https://www.ebi.ac.uk/ena/browser/view/' +
+          encodeURIComponent(srr) + '" target="_blank">ENA browser</a></td></tr>' +
+          "<tr><td>Tip</td><td>Use <code>python -m http.server 8080</code> if local, or GitHub Pages.</td></tr>" +
+          "</table>";
+        await renderReferencePanel(null, null, null);
+        return;
+      }
+
+      const rec = result.rec;
+      content.innerHTML = renderInputTable(rec, result.source);
+      const suggested = suggestReference(rec.scientific_name, rec.tax_id);
+      await renderReferencePanel(suggested, rec.scientific_name, rec.tax_id);
+
+      $("nextBox").innerHTML =
+        "<strong>Next (real analysis)</strong><br /><br />" +
+        "Run in this project folder:<br /><br />" +
+        "<code>python run_interactive_pipeline.py</code><br /><br />" +
+        "Option <strong>1</strong> → enter accession <strong>" + srr + "</strong><br /><br />" +
+        "Outputs: <code>results/run_*</code>, <code>logs/pipeline_" + srr + "_*.log</code>";
     }
 
+    /* UI: option cards */
     document.querySelectorAll(".option").forEach(function (opt) {
       opt.addEventListener("click", function () {
         document.querySelectorAll(".option").forEach(function (o) {
