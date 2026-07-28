@@ -25,21 +25,20 @@
     header h1 { font-size: 1.2rem; font-weight: 600; }
     header .sub { font-size: 0.8rem; color: var(--muted); }
     .container { max-width: 1200px; margin: 0 auto; padding: 1.5rem; width: 100%; flex: 1; }
-    
-    /* Layout Grid */
     .dashboard-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
     @media (max-width: 900px) { .dashboard-grid { grid-template-columns: 1fr; } }
-    
     .card {
       background: var(--surface); border: 1px solid var(--border);
       border-radius: var(--radius); padding: 1.25rem; margin-bottom: 1.25rem;
     }
     .card.full-width { grid-column: 1 / -1; }
-    .card h2 { font-size: 1rem; font-weight: 600; margin-bottom: 1rem; color: var(--accent); display: flex; justify-content: space-between; align-items: center; }
-
-    .input-row { display: flex; gap: 0.75rem; margin-top: 0.75rem; flex-wrap: wrap; }
+    .card h2 {
+      font-size: 1rem; font-weight: 600; margin-bottom: 1rem; color: var(--accent);
+      display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; flex-wrap: wrap;
+    }
+    .input-row { display: flex; gap: 0.75rem; margin-top: 0.75rem; flex-wrap: wrap; align-items: center; }
     input[type="text"] {
-      flex: 1; min-width: 200px; background: var(--bg); border: 1px solid var(--border);
+      flex: 1; min-width: 180px; background: var(--bg); border: 1px solid var(--border);
       color: var(--text); padding: 0.6rem 0.9rem; border-radius: 8px; font-size: 0.9rem;
     }
     input:focus { outline: none; border-color: var(--accent); }
@@ -49,188 +48,392 @@
       font-size: 0.9rem; cursor: pointer;
     }
     button:hover { background: var(--accent-dim); }
-    button.secondary { background: transparent; border: 1px solid var(--border); color: var(--text); }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    button.secondary {
+      background: transparent; border: 1px solid var(--border); color: var(--text);
+    }
     button.secondary:hover { border-color: var(--accent); color: var(--accent); }
-
-    /* Terminal */
+    .hint {
+      font-size: 0.8rem; color: var(--muted); margin-top: 0.75rem;
+      padding: 0.6rem 0.8rem; background: rgba(56, 189, 248, 0.06);
+      border-radius: 6px; border: 1px solid rgba(56, 189, 248, 0.15);
+    }
+    .hint code { color: #67e8f9; font-size: 0.78rem; }
+    .options { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 0.75rem; }
+    @media (max-width: 640px) { .options { grid-template-columns: 1fr; } }
+    .option {
+      border: 2px solid var(--border); border-radius: 8px; padding: 0.85rem;
+      cursor: pointer; transition: border-color 0.15s, background 0.15s;
+    }
+    .option:hover { border-color: var(--accent-dim); }
+    .option.active {
+      border-color: var(--accent); background: rgba(56, 189, 248, 0.08);
+    }
+    .option h3 { font-size: 0.9rem; margin-bottom: 0.25rem; }
+    .option p { font-size: 0.75rem; color: var(--muted); }
     .terminal-box {
       background: var(--term-bg); border: 1px solid var(--border); border-radius: 8px;
-      padding: 1rem; font-family: monospace; font-size: 0.82rem; color: var(--term-text);
-      height: 280px; overflow-y: auto; white-space: pre-wrap;
+      padding: 1rem; font-family: ui-monospace, monospace; font-size: 0.82rem;
+      color: var(--term-text); height: 280px; overflow-y: auto; white-space: pre-wrap;
     }
-    .terminal-input-row { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
-    .terminal-input-row input { background: #020617; font-family: monospace; color: var(--accent); }
-
-    /* Extracted Content Panels */
+    .terminal-input-row { display: flex; gap: 0.5rem; margin-top: 0.75rem; flex-wrap: wrap; }
+    .terminal-input-row input {
+      background: #020617; font-family: ui-monospace, monospace; color: var(--accent);
+    }
     .extracted-panel {
-      background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 1rem;
-      min-height: 140px; font-size: 0.85rem; color: var(--muted);
+      background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+      padding: 1rem; min-height: 140px; font-size: 0.85rem; color: var(--muted);
     }
     .extracted-panel pre {
-      font-family: monospace; font-size: 0.8rem; color: var(--text); white-space: pre-wrap;
-      word-break: break-all; margin-top: 0.5rem; background: rgba(15, 23, 42, 0.6);
-      padding: 0.5rem; border-radius: 6px; border: 1px solid rgba(71, 85, 105, 0.3);
+      font-family: ui-monospace, monospace; font-size: 0.8rem; color: var(--text);
+      white-space: pre-wrap; word-break: break-all; margin-top: 0.5rem;
+      background: rgba(15, 23, 42, 0.6); padding: 0.5rem; border-radius: 6px;
+      border: 1px solid rgba(71, 85, 105, 0.3);
     }
-
+    .extracted-panel strong { color: var(--text); }
+    .extracted-panel code { color: #67e8f9; font-size: 0.8rem; }
     .badge-sm {
       display: inline-block; font-size: 0.65rem; font-weight: 700;
-      padding: 0.1rem 0.4rem; border-radius: 999px; background: rgba(56, 189, 248, 0.2); color: var(--accent);
+      padding: 0.1rem 0.4rem; border-radius: 999px;
+      background: rgba(56, 189, 248, 0.2); color: var(--accent);
     }
     .badge-ok { background: rgba(34, 197, 94, 0.2); color: var(--success); }
     .badge-warn { background: rgba(245, 158, 11, 0.2); color: var(--warning); }
-    
     footer {
-      text-align: center; padding: 1rem; font-size: 0.75rem; color: var(--muted); border-top: 1px solid var(--border);
+      text-align: center; padding: 1rem; font-size: 0.75rem;
+      color: var(--muted); border-top: 1px solid var(--border);
     }
   </style>
 </head>
 <body>
   <header>
     <h1>NGS Variant Calling Dashboard</h1>
-    <div class="sub">Terminal Stream &amp; Dynamic Panel Extraction</div>
+    <div class="sub">Accession input → terminal command → panel extraction</div>
   </header>
 
   <div class="container">
-    
-    <!-- Top Row: Terminal Panel taking full command interface -->
+    <!-- Accession / mode panel -->
     <div class="card full-width">
       <h2>
-        <span>Interactive Terminal Stream</span>
-        <span class="badge-sm badge-ok" id="termStatusBadge">Ready</span>
+        <span>1. Sample accession</span>
+        <span class="badge-sm" id="accBadge">Not set</span>
       </h2>
-      <div class="terminal-box" id="termOutput">Type a pipeline execution command or click "Run Command" below...
-$ python run_interactive_pipeline.py --exec</div>
-      <div class="terminal-input-row">
-        <input type="text" id="termCommandInput" value="python run_interactive_pipeline.py" placeholder="Type shell command..." />
-        <button id="termSendBtn">Run Command</button>
+
+      <div class="options">
+        <div class="option active" data-mode="sra" id="optSra">
+          <h3>Option 1 · NCBI SRA</h3>
+          <p>Enter SRR / ERR / DRR. Used as argument to the pipeline command.</p>
+        </div>
+        <div class="option" data-mode="local" id="optLocal">
+          <h3>Option 2 · Local FASTQ</h3>
+          <p>Uses local paired FASTQ paths (no SRA accession).</p>
+        </div>
+      </div>
+
+      <div class="input-row" id="sraRow">
+        <input type="text" id="srrInput" placeholder="e.g. SRR1553607" value="SRR1553607" />
+        <button type="button" id="setAccBtn" class="secondary">Set accession</button>
+        <button type="button" id="runPipelineBtn">Run pipeline with this accession</button>
+      </div>
+
+      <div class="input-row hidden" id="localRow">
+        <button type="button" id="runLocalBtn">Run pipeline (local FASTQ)</button>
+      </div>
+
+      <div class="hint">
+        Accession is injected into the terminal command, e.g.
+        <code>python run_interactive_pipeline.py --sample SRR1553607</code>.
+        This UI <strong>simulates</strong> the stream; real BWA/fastp run via
+        <code>python run_interactive_pipeline.py</code> in the project folder.
       </div>
     </div>
 
-    <!-- Bottom Grid: Independent panels extracting text directly from terminal flow -->
+    <!-- Terminal -->
+    <div class="card full-width">
+      <h2>
+        <span>2. Interactive terminal stream</span>
+        <span class="badge-sm badge-ok" id="termStatusBadge">Ready</span>
+      </h2>
+      <div class="terminal-box" id="termOutput">Type a command or use “Run pipeline with this accession” above.
+$ </div>
+      <div class="terminal-input-row">
+        <input type="text" id="termCommandInput" placeholder="Shell command (accession auto-filled if empty)…" />
+        <button type="button" id="termSendBtn">Run command</button>
+        <button type="button" id="termClearBtn" class="secondary">Clear</button>
+      </div>
+    </div>
+
+    <!-- Extracted panels -->
     <div class="dashboard-grid">
-      
-      <!-- Panel 1: Input Data Extraction -->
       <div class="card">
-        <h2>Input Feed <span class="badge-sm" id="inputBadge">Waiting</span></h2>
+        <h2>Input feed <span class="badge-sm" id="inputBadge">Waiting</span></h2>
         <div class="extracted-panel" id="panelInput">
-          <em>Extracting FASTQ source targets from terminal output...</em>
+          <em>Extracting FASTQ source targets from terminal output…</em>
         </div>
       </div>
-
-      <!-- Panel 2: Reference Extraction -->
       <div class="card">
-        <h2>Reference Genome <span class="badge-sm" id="refBadge">Waiting</span></h2>
+        <h2>Reference genome <span class="badge-sm" id="refBadge">Waiting</span></h2>
         <div class="extracted-panel" id="panelRef">
-          <em>Extracting reference files &amp; indexing parameters...</em>
+          <em>Extracting reference files &amp; indexing parameters…</em>
         </div>
       </div>
-
-      <!-- Panel 3: Results Extraction -->
       <div class="card">
-        <h2>Variant Results <span class="badge-sm" id="resBadge">Waiting</span></h2>
+        <h2>Variant results <span class="badge-sm" id="resBadge">Waiting</span></h2>
         <div class="extracted-panel" id="panelRes">
-          <em>Extracting variant call logs and VCF summaries...</em>
+          <em>Extracting variant call logs and VCF summaries…</em>
         </div>
       </div>
-
-      <!-- Panel 4: Execution System Log Extraction -->
       <div class="card">
-        <h2>System Logs <span class="badge-sm" id="logBadge">Waiting</span></h2>
+        <h2>System logs <span class="badge-sm" id="logBadge">Waiting</span></h2>
         <div class="extracted-panel" id="panelLog">
-          <em>Extracting standard error / execution diagnostics...</em>
+          <em>Extracting execution diagnostics…</em>
         </div>
       </div>
-
     </div>
   </div>
 
   <footer>
-    NGS Pipeline Stream Extractor · Browser Terminal Mirror
+    NGS Pipeline Stream Extractor · Accession drives the simulated command
   </footer>
 
   <script>
     const $ = id => document.getElementById(id);
 
+    const state = {
+      mode: "sra",
+      accession: "SRR1553607",
+      running: false
+    };
+
+    function setAccessionFromInput() {
+      if (state.mode === "local") {
+        state.accession = "local_fastq";
+        $("accBadge").textContent = "local_fastq";
+        $("accBadge").className = "badge-sm badge-ok";
+        return state.accession;
+      }
+      const v = ($("srrInput").value || "").trim() || "SRR1553607";
+      state.accession = v;
+      $("srrInput").value = v;
+      $("accBadge").textContent = v;
+      $("accBadge").className = "badge-sm badge-ok";
+      // Keep terminal command in sync
+      $("termCommandInput").value =
+        "python run_interactive_pipeline.py --sample " + v;
+      return v;
+    }
+
     function appendTerminal(text) {
       const term = $("termOutput");
-      term.textContent += "\n" + text;
+      term.textContent += (term.textContent.endsWith("\n") || term.textContent.endsWith("$ ") ? "" : "\n") + text;
+      if (!text.startsWith("$") && !term.textContent.endsWith("\n")) {
+        /* keep scrolling */
+      }
       term.scrollTop = term.scrollHeight;
       parseTerminalForPanels(term.textContent);
     }
 
-    // Dynamic state parser mapping terminal text patterns straight to designated panels
     function parseTerminalForPanels(fullLog) {
-      // 1. Input Panel Extraction
       const inputMatch = fullLog.match(/\[INFO\] Fetching fastq files for (.+?) via (.+?)\.\.\./);
       if (inputMatch) {
         $("inputBadge").textContent = "Captured";
         $("inputBadge").className = "badge-sm badge-ok";
-        $("panelInput").innerHTML = `Target Accession: <strong>${inputMatch[1]}</strong><br>Downloader Tool: <code>${inputMatch[2]}</code><pre>Status: Paired FASTQs mapped successfully.</pre>`;
+        $("panelInput").innerHTML =
+          "Target accession: <strong>" + inputMatch[1] + "</strong><br>" +
+          "Downloader: <code>" + inputMatch[2] + "</code>" +
+          "<pre>Status: Paired FASTQs mapped for this run.</pre>";
       }
 
-      // 2. Reference Panel Extraction
-      const refMatch = fullLog.match(/\[INFO\] Aligning reads against (.+?) using (.+?)\.\./);
+      const localMatch = fullLog.match(/\[INFO\] Using local FASTQ pair under (.+)/);
+      if (localMatch) {
+        $("inputBadge").textContent = "Local";
+        $("inputBadge").className = "badge-sm badge-ok";
+        $("panelInput").innerHTML =
+          "Mode: <strong>Local FASTQ</strong><br>" +
+          "Path hint: <code>" + localMatch[1] + "</code>" +
+          "<pre>input_1.fastq + input_2.fastq</pre>";
+      }
+
+      const refMatch = fullLog.match(/\[INFO\] Aligning reads against (.+?) using (.+?)\.\.\./);
       if (refMatch) {
         $("refBadge").textContent = "Indexed";
         $("refBadge").className = "badge-sm badge-ok";
-        $("panelRef").innerHTML = `Reference Sequence: <code>${refMatch[1]}</code><br>Aligner Engine: <strong>${refMatch[2]}</strong><pre>Index status: BWA index verified in memory.</pre>`;
+        $("panelRef").innerHTML =
+          "Reference: <code>" + refMatch[1] + "</code><br>" +
+          "Aligner: <strong>" + refMatch[2] + "</strong>" +
+          "<pre>Index status: BWA index verified (ref/ecoli.fna*).</pre>";
       }
 
-      // 3. Results Panel Extraction
       const resMatch = fullLog.match(/\[SUCCESS\] Variants written to (.+)/);
       if (resMatch) {
         $("resBadge").textContent = "Generated";
         $("resBadge").className = "badge-sm badge-ok";
-        $("panelRes").innerHTML = `Output VCF Path: <pre>${resMatch[1]}</pre>Metrics: 142 SNVs, 18 Indels mapped cleanly.`;
+        $("panelRes").innerHTML =
+          "Output VCF: <pre>" + resMatch[1] + "</pre>" +
+          "Demo metrics: SNVs / indels reported in pipeline log.";
       }
 
-      // 4. System Logs Extraction
-      const logMatch = fullLog.match(/\[DIAGNOSTIC\] (.+)/);
-      if (logMatch || fullLog.includes("python")) {
+      if (fullLog.includes("[DIAGNOSTIC]") || fullLog.includes("python")) {
         $("logBadge").textContent = "Active";
         $("logBadge").className = "badge-sm badge-ok";
-        $("panelLog").innerHTML = `<pre>${fullLog.split('\n').filter(l => l.includes('[') || l.includes('$')).slice(-4).join('\n')}</pre>`;
+        const lines = fullLog.split("\n").filter(function (l) {
+          return l.includes("[") || l.trim().startsWith("$");
+        }).slice(-6);
+        $("panelLog").innerHTML = "<pre>" + lines.join("\n") + "</pre>";
       }
     }
 
-    async function simulatePipelineStream() {
+    async function simulatePipelineStream(accession, isLocal) {
+      if (state.running) return;
+      state.running = true;
       $("termStatusBadge").textContent = "Running";
       $("termStatusBadge").className = "badge-sm badge-warn";
+      $("runPipelineBtn").disabled = true;
+      $("runLocalBtn").disabled = true;
+      $("termSendBtn").disabled = true;
 
-      appendTerminal(`$ python run_interactive_pipeline.py`);
-      await new Promise(r => setTimeout(r, 600));
-      
-      appendTerminal(`[DIAGNOSTIC] Setting up thread pools and environment variables.`);
-      appendTerminal(`[INFO] Fetching fastq files for SRR1553607 via fasterq-dump...`);
-      await new Promise(r => setTimeout(r, 900));
-      
-      appendTerminal(`[INFO] Aligning reads against ref/ecoli.fna using BWA MEM...`);
-      await new Promise(r => setTimeout(r, 900));
-      
-      appendTerminal(`[INFO] Sorting alignments and computing coverage via Samtools...`);
-      await new Promise(r => setTimeout(r, 800));
+      const acc = accession || state.accession || "SRR1553607";
+      const cmd = isLocal
+        ? "python run_interactive_pipeline.py --local"
+        : "python run_interactive_pipeline.py --sample " + acc;
 
-      appendTerminal(`[SUCCESS] Variants written to results/run_SRR1553607/variants.vcf`);
-      
+      appendTerminal("$ " + cmd);
+      await delay(500);
+      appendTerminal("[DIAGNOSTIC] Setting up thread pools and environment variables.");
+      await delay(400);
+
+      if (isLocal) {
+        appendTerminal("[INFO] Using local FASTQ pair under data/run_*/");
+      } else {
+        appendTerminal("[INFO] Fetching fastq files for " + acc + " via fasterq-dump...");
+      }
+      await delay(900);
+
+      appendTerminal("[INFO] Aligning reads against ref/ecoli.fna using BWA MEM...");
+      await delay(900);
+      appendTerminal("[INFO] Sorting alignments and computing coverage via Samtools...");
+      await delay(700);
+      appendTerminal("[INFO] Calling variants with bcftools mpileup | call...");
+      await delay(600);
+
+      const outVcf = isLocal
+        ? "results/run_local/final_variants.vcf"
+        : "results/run_" + acc + "/final_variants.vcf";
+      appendTerminal("[SUCCESS] Variants written to " + outVcf);
+      appendTerminal("[DIAGNOSTIC] Pipeline finished with exit code 0.");
+
       $("termStatusBadge").textContent = "Idle / Finished";
       $("termStatusBadge").className = "badge-sm badge-ok";
+      state.running = false;
+      $("runPipelineBtn").disabled = false;
+      $("runLocalBtn").disabled = false;
+      $("termSendBtn").disabled = false;
     }
 
-    $("termSendBtn").addEventListener("click", () => {
-      const cmd = $("termCommandInput").value.trim();
-      if (!cmd) return;
-      appendTerminal(`$ ${cmd}`);
-      if (cmd.includes("python")) {
-        simulatePipelineStream();
-      } else {
-        appendTerminal(`[DIAGNOSTIC] Command executed successfully with code 0.`);
-      }
-      $("termCommandInput").value = "";
+    function delay(ms) {
+      return new Promise(function (r) { setTimeout(r, ms); });
+    }
+
+    /* Mode toggle */
+    document.querySelectorAll(".option").forEach(function (opt) {
+      opt.addEventListener("click", function () {
+        document.querySelectorAll(".option").forEach(function (o) {
+          o.classList.remove("active");
+        });
+        opt.classList.add("active");
+        state.mode = opt.dataset.mode;
+        $("sraRow").classList.toggle("hidden", state.mode !== "sra");
+        $("localRow").classList.toggle("hidden", state.mode !== "local");
+        if (state.mode === "local") {
+          state.accession = "local_fastq";
+          $("accBadge").textContent = "local_fastq";
+          $("accBadge").className = "badge-sm badge-ok";
+          $("termCommandInput").value = "python run_interactive_pipeline.py --local";
+        } else {
+          setAccessionFromInput();
+        }
+      });
     });
 
-    $("termCommandInput").addEventListener("keydown", (e) => {
+    $("setAccBtn").addEventListener("click", function () {
+      const v = setAccessionFromInput();
+      appendTerminal("[DIAGNOSTIC] Accession set to " + v);
+    });
+
+    $("runPipelineBtn").addEventListener("click", function () {
+      const v = setAccessionFromInput();
+      simulatePipelineStream(v, false);
+    });
+
+    $("runLocalBtn").addEventListener("click", function () {
+      state.accession = "local_fastq";
+      $("accBadge").textContent = "local_fastq";
+      $("accBadge").className = "badge-sm badge-ok";
+      simulatePipelineStream("local_fastq", true);
+    });
+
+    $("termSendBtn").addEventListener("click", function () {
+      let cmd = $("termCommandInput").value.trim();
+      if (!cmd) {
+        const v = setAccessionFromInput();
+        cmd = state.mode === "local"
+          ? "python run_interactive_pipeline.py --local"
+          : "python run_interactive_pipeline.py --sample " + v;
+      }
+      // If user typed bare python without --sample, inject accession
+      if (
+        state.mode === "sra" &&
+        /run_interactive_pipeline\.py/.test(cmd) &&
+        !/--sample/.test(cmd) &&
+        !/--local/.test(cmd)
+      ) {
+        const v = setAccessionFromInput();
+        cmd = cmd.replace(
+          /run_interactive_pipeline\.py/,
+          "run_interactive_pipeline.py --sample " + v
+        );
+      }
+      $("termCommandInput").value = cmd;
+      if (/run_interactive_pipeline\.py/.test(cmd) || /python/.test(cmd)) {
+        const isLocal = /--local/.test(cmd) || state.mode === "local";
+        let acc = state.accession;
+        const m = cmd.match(/--sample\s+(\S+)/);
+        if (m) acc = m[1];
+        simulatePipelineStream(acc, isLocal);
+      } else {
+        appendTerminal("$ " + cmd);
+        appendTerminal("[DIAGNOSTIC] Command noted (simulation only; exit code 0).");
+      }
+    });
+
+    $("termCommandInput").addEventListener("keydown", function (e) {
       if (e.key === "Enter") $("termSendBtn").click();
     });
+
+    $("srrInput").addEventListener("keydown", function (e) {
+      if (e.key === "Enter") $("runPipelineBtn").click();
+    });
+
+    $("termClearBtn").addEventListener("click", function () {
+      $("termOutput").textContent = "Terminal cleared.\n$ ";
+      $("inputBadge").textContent = "Waiting";
+      $("inputBadge").className = "badge-sm";
+      $("refBadge").textContent = "Waiting";
+      $("refBadge").className = "badge-sm";
+      $("resBadge").textContent = "Waiting";
+      $("resBadge").className = "badge-sm";
+      $("logBadge").textContent = "Waiting";
+      $("logBadge").className = "badge-sm";
+      $("panelInput").innerHTML = "<em>Extracting FASTQ source targets from terminal output…</em>";
+      $("panelRef").innerHTML = "<em>Extracting reference files &amp; indexing parameters…</em>";
+      $("panelRes").innerHTML = "<em>Extracting variant call logs and VCF summaries…</em>";
+      $("panelLog").innerHTML = "<em>Extracting execution diagnostics…</em>";
+      $("termStatusBadge").textContent = "Ready";
+      $("termStatusBadge").className = "badge-sm badge-ok";
+    });
+
+    // Init
+    setAccessionFromInput();
   </script>
 </body>
 </html>
