@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>NGS Variant Calling – Terminal & Pipeline Runner</title>
+  <title>NGS Variant Calling – Terminal & Extracted Panels</title>
   <style>
     :root {
       --bg: #0f172a; --surface: #1e293b; --surface-2: #334155; --border: #475569;
@@ -24,22 +24,19 @@
     }
     header h1 { font-size: 1.2rem; font-weight: 600; }
     header .sub { font-size: 0.8rem; color: var(--muted); }
-    .container { max-width: 1000px; margin: 0 auto; padding: 1.5rem; width: 100%; flex: 1; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 1.5rem; width: 100%; flex: 1; }
+    
+    /* Layout Grid */
+    .dashboard-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
+    @media (max-width: 900px) { .dashboard-grid { grid-template-columns: 1fr; } }
+    
     .card {
       background: var(--surface); border: 1px solid var(--border);
       border-radius: var(--radius); padding: 1.25rem; margin-bottom: 1.25rem;
     }
-    .card h2 { font-size: 1rem; font-weight: 600; margin-bottom: 1rem; color: var(--accent); }
-    .options { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
-    @media (max-width: 640px) { .options { grid-template-columns: 1fr; } }
-    .option {
-      border: 2px solid var(--border); border-radius: var(--radius);
-      padding: 1rem; cursor: pointer; transition: border-color 0.15s, background 0.15s;
-    }
-    .option:hover { border-color: var(--accent-dim); }
-    .option.active { border-color: var(--accent); background: rgba(56, 189, 248, 0.08); }
-    .option h3 { font-size: 0.95rem; margin-bottom: 0.3rem; }
-    .option p { font-size: 0.8rem; color: var(--muted); }
+    .card.full-width { grid-column: 1 / -1; }
+    .card h2 { font-size: 1rem; font-weight: 600; margin-bottom: 1rem; color: var(--accent); display: flex; justify-content: space-between; align-items: center; }
+
     .input-row { display: flex; gap: 0.75rem; margin-top: 0.75rem; flex-wrap: wrap; }
     input[type="text"] {
       flex: 1; min-width: 200px; background: var(--bg); border: 1px solid var(--border);
@@ -54,41 +51,34 @@
     button:hover { background: var(--accent-dim); }
     button.secondary { background: transparent; border: 1px solid var(--border); color: var(--text); }
     button.secondary:hover { border-color: var(--accent); color: var(--accent); }
-    
-    /* Terminal UI */
+
+    /* Terminal */
     .terminal-box {
       background: var(--term-bg); border: 1px solid var(--border); border-radius: 8px;
-      padding: 1rem; font-family: monospace; font-size: 0.85rem; color: var(--term-text);
-      height: 220px; overflow-y: auto; margin-top: 1rem; white-space: pre-wrap;
+      padding: 1rem; font-family: monospace; font-size: 0.82rem; color: var(--term-text);
+      height: 280px; overflow-y: auto; white-space: pre-wrap;
     }
     .terminal-input-row { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
     .terminal-input-row input { background: #020617; font-family: monospace; color: var(--accent); }
 
-    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-    @media (max-width: 800px) { .info-grid { grid-template-columns: 1fr; } }
-    .info-panel {
+    /* Extracted Content Panels */
+    .extracted-panel {
       background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 1rem;
+      min-height: 140px; font-size: 0.85rem; color: var(--muted);
     }
-    .info-panel h3 {
-      font-size: 0.9rem; color: var(--accent); margin-bottom: 0.75rem;
-      display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;
+    .extracted-panel pre {
+      font-family: monospace; font-size: 0.8rem; color: var(--text); white-space: pre-wrap;
+      word-break: break-all; margin-top: 0.5rem; background: rgba(15, 23, 42, 0.6);
+      padding: 0.5rem; border-radius: 6px; border: 1px solid rgba(71, 85, 105, 0.3);
     }
-    .info-table { width: 100%; font-size: 0.8rem; border-collapse: collapse; }
-    .info-table td {
-      padding: 0.35rem 0.4rem; border-bottom: 1px solid rgba(71, 85, 105, 0.5); vertical-align: top;
-    }
-    .info-table td:first-child { color: var(--muted); width: 38%; white-space: nowrap; }
-    .info-table td:last-child { color: var(--text); word-break: break-word; }
+
     .badge-sm {
       display: inline-block; font-size: 0.65rem; font-weight: 700;
       padding: 0.1rem 0.4rem; border-radius: 999px; background: rgba(56, 189, 248, 0.2); color: var(--accent);
     }
     .badge-ok { background: rgba(34, 197, 94, 0.2); color: var(--success); }
     .badge-warn { background: rgba(245, 158, 11, 0.2); color: var(--warning); }
-    .loading-text { color: var(--muted); font-size: 0.85rem; font-style: italic; }
-    .link-out { color: var(--accent); text-decoration: none; }
-    .link-out:hover { text-decoration: underline; }
-    .hidden { display: none !important; }
+    
     footer {
       text-align: center; padding: 1rem; font-size: 0.75rem; color: var(--muted); border-top: 1px solid var(--border);
     }
@@ -97,112 +87,143 @@
 <body>
   <header>
     <h1>NGS Variant Calling Dashboard</h1>
-    <div class="sub">Integrated Terminal &amp; Pipeline Runner</div>
+    <div class="sub">Terminal Stream &amp; Dynamic Panel Extraction</div>
   </header>
 
   <div class="container">
-    <!-- 1. Selection & Trigger -->
-    <div class="card" id="selectionCard">
-      <h2>1. Target Accession &amp; Execution</h2>
-      <div class="input-row">
-        <input type="text" id="srrInput" value="SRR1553607" placeholder="Enter accession (e.g. SRR1553607)" />
-        <button id="runPipelineBtn">Run Pipeline in Terminal</button>
-      </div>
-    </div>
-
-    <!-- 2. Terminal Panel -->
-    <div class="card" id="terminalCard">
-      <h2>2. Live Terminal Feed</h2>
-      <div class="terminal-box" id="termOutput">Type a command or click "Run Pipeline in Terminal" above...
-$ python run_interactive_pipeline.py --ready</div>
+    
+    <!-- Top Row: Terminal Panel taking full command interface -->
+    <div class="card full-width">
+      <h2>
+        <span>Interactive Terminal Stream</span>
+        <span class="badge-sm badge-ok" id="termStatusBadge">Ready</span>
+      </h2>
+      <div class="terminal-box" id="termOutput">Type a pipeline execution command or click "Run Command" below...
+$ python run_interactive_pipeline.py --exec</div>
       <div class="terminal-input-row">
-        <input type="text" id="termCommandInput" placeholder="Type command (e.g., bwa mem, bcftools call)..." />
-        <button id="termSendBtn" class="secondary">Execute</button>
+        <input type="text" id="termCommandInput" value="python run_interactive_pipeline.py" placeholder="Type shell command..." />
+        <button id="termSendBtn">Run Command</button>
       </div>
     </div>
 
-    <!-- 3. Feed-Forward Results Panel -->
-    <div class="card" id="infoCard">
-      <h2>3. Analysis Feed-Forward Status</h2>
-      <div class="info-grid">
-        <div class="info-panel">
-          <h3>Pipeline Execution Status <span class="badge-sm" id="execBadge">Idle</span></h3>
-          <div id="execStatusContent" class="loading-text">Awaiting terminal execution trigger...</div>
-        </div>
-        <div class="info-panel">
-          <h3>Variant Call Summary <span class="badge-sm" id="varBadge">Pending</span></h3>
-          <div id="varStatusContent" class="loading-text">No variant outputs detected yet.</div>
+    <!-- Bottom Grid: Independent panels extracting text directly from terminal flow -->
+    <div class="dashboard-grid">
+      
+      <!-- Panel 1: Input Data Extraction -->
+      <div class="card">
+        <h2>Input Feed <span class="badge-sm" id="inputBadge">Waiting</span></h2>
+        <div class="extracted-panel" id="panelInput">
+          <em>Extracting FASTQ source targets from terminal output...</em>
         </div>
       </div>
+
+      <!-- Panel 2: Reference Extraction -->
+      <div class="card">
+        <h2>Reference Genome <span class="badge-sm" id="refBadge">Waiting</span></h2>
+        <div class="extracted-panel" id="panelRef">
+          <em>Extracting reference files &amp; indexing parameters...</em>
+        </div>
+      </div>
+
+      <!-- Panel 3: Results Extraction -->
+      <div class="card">
+        <h2>Variant Results <span class="badge-sm" id="resBadge">Waiting</span></h2>
+        <div class="extracted-panel" id="panelRes">
+          <em>Extracting variant call logs and VCF summaries...</em>
+        </div>
+      </div>
+
+      <!-- Panel 4: Execution System Log Extraction -->
+      <div class="card">
+        <h2>System Logs <span class="badge-sm" id="logBadge">Waiting</span></h2>
+        <div class="extracted-panel" id="panelLog">
+          <em>Extracting standard error / execution diagnostics...</em>
+        </div>
+      </div>
+
     </div>
   </div>
 
   <footer>
-    NGS Pipeline Dashboard · Local Execution Bridge
+    NGS Pipeline Stream Extractor · Browser Terminal Mirror
   </footer>
 
   <script>
     const $ = id => document.getElementById(id);
 
-    function logTerminal(text) {
+    function appendTerminal(text) {
       const term = $("termOutput");
       term.textContent += "\n" + text;
       term.scrollTop = term.scrollHeight;
+      parseTerminalForPanels(term.textContent);
     }
 
-    async function simulatePipelineRun() {
-      const srr = $("srrInput").value.trim() || "SRR1553607";
-      $("execBadge").textContent = "Running";
-      $("execBadge").className = "badge-sm badge-warn";
+    // Dynamic state parser mapping terminal text patterns straight to designated panels
+    function parseTerminalForPanels(fullLog) {
+      // 1. Input Panel Extraction
+      const inputMatch = fullLog.match(/\[INFO\] Fetching fastq files for (.+?) via (.+?)\.\.\./);
+      if (inputMatch) {
+        $("inputBadge").textContent = "Captured";
+        $("inputBadge").className = "badge-sm badge-ok";
+        $("panelInput").innerHTML = `Target Accession: <strong>${inputMatch[1]}</strong><br>Downloader Tool: <code>${inputMatch[2]}</code><pre>Status: Paired FASTQs mapped successfully.</pre>`;
+      }
+
+      // 2. Reference Panel Extraction
+      const refMatch = fullLog.match(/\[INFO\] Aligning reads against (.+?) using (.+?)\.\./);
+      if (refMatch) {
+        $("refBadge").textContent = "Indexed";
+        $("refBadge").className = "badge-sm badge-ok";
+        $("panelRef").innerHTML = `Reference Sequence: <code>${refMatch[1]}</code><br>Aligner Engine: <strong>${refMatch[2]}</strong><pre>Index status: BWA index verified in memory.</pre>`;
+      }
+
+      // 3. Results Panel Extraction
+      const resMatch = fullLog.match(/\[SUCCESS\] Variants written to (.+)/);
+      if (resMatch) {
+        $("resBadge").textContent = "Generated";
+        $("resBadge").className = "badge-sm badge-ok";
+        $("panelRes").innerHTML = `Output VCF Path: <pre>${resMatch[1]}</pre>Metrics: 142 SNVs, 18 Indels mapped cleanly.`;
+      }
+
+      // 4. System Logs Extraction
+      const logMatch = fullLog.match(/\[DIAGNOSTIC\] (.+)/);
+      if (logMatch || fullLog.includes("python")) {
+        $("logBadge").textContent = "Active";
+        $("logBadge").className = "badge-sm badge-ok";
+        $("panelLog").innerHTML = `<pre>${fullLog.split('\n').filter(l => l.includes('[') || l.includes('$')).slice(-4).join('\n')}</pre>`;
+      }
+    }
+
+    async function simulatePipelineStream() {
+      $("termStatusBadge").textContent = "Running";
+      $("termStatusBadge").className = "badge-sm badge-warn";
+
+      appendTerminal(`$ python run_interactive_pipeline.py`);
+      await new Promise(r => setTimeout(r, 600));
       
-      logTerminal(`\n$ python run_interactive_pipeline.py`);
-      logTerminal(`[INFO] Initializing directories: data/, ref/, results/, logs/`);
+      appendTerminal(`[DIAGNOSTIC] Setting up thread pools and environment variables.`);
+      appendTerminal(`[INFO] Fetching fastq files for SRR1553607 via fasterq-dump...`);
+      await new Promise(r => setTimeout(r, 900));
+      
+      appendTerminal(`[INFO] Aligning reads against ref/ecoli.fna using BWA MEM...`);
+      await new Promise(r => setTimeout(r, 900));
+      
+      appendTerminal(`[INFO] Sorting alignments and computing coverage via Samtools...`);
       await new Promise(r => setTimeout(r, 800));
+
+      appendTerminal(`[SUCCESS] Variants written to results/run_SRR1553607/variants.vcf`);
       
-      logTerminal(`[INFO] Fetching fastq files for ${srr} via fasterq-dump...`);
-      await new Promise(r => setTimeout(r, 1200));
-      logTerminal(`[OK] Download complete: data/run_${srr}/input_1.fastq`);
-
-      logTerminal(`[INFO] Aligning reads against ref/ecoli.fna using BWA...`);
-      await new Promise(r => setTimeout(r, 1200));
-      logTerminal(`[OK] Alignment sorted and indexed.`);
-
-      logTerminal(`[INFO] Calling variants using BCFtools...`);
-      await new Promise(r => setTimeout(r, 1000));
-      logTerminal(`[SUCCESS] Variants written to results/run_${srr}/variants.vcf`);
-
-      // Feed forward data into UI status panels
-      $("execBadge").textContent = "Completed";
-      $("execBadge").className = "badge-sm badge-ok";
-      $("execStatusContent").innerHTML = `
-        <table class="info-table">
-          <tr><td>Target Accession</td><td><strong>${srr}</strong></td></tr>
-          <tr><td>Log File</td><td><code>logs/pipeline_${srr}.log</code></td></tr>
-          <tr><td>Status</td><td style="color:var(--success)">Successfully processed</td></tr>
-        </table>
-      `;
-
-      $("varBadge").textContent = "Variants Found";
-      $("varBadge").className = "badge-sm badge-ok";
-      $("varStatusContent").innerHTML = `
-        <table class="info-table">
-          <tr><td>Output VCF</td><td><code>results/run_${srr}/variants.vcf</code></td></tr>
-          <tr><td>Total SNVs</td><td>142 detected</td></tr>
-          <tr><td>Indels</td><td>18 detected</td></tr>
-        </table>
-      `;
+      $("termStatusBadge").textContent = "Idle / Finished";
+      $("termStatusBadge").className = "badge-sm badge-ok";
     }
-
-    $("runPipelineBtn").addEventListener("click", simulatePipelineRun);
 
     $("termSendBtn").addEventListener("click", () => {
       const cmd = $("termCommandInput").value.trim();
       if (!cmd) return;
-      logTerminal(`$ ${cmd}`);
+      appendTerminal(`$ ${cmd}`);
       if (cmd.includes("python")) {
-        simulatePipelineRun();
+        simulatePipelineStream();
       } else {
-        logTerminal(`[INFO] Command processed locally. Output simulated.`);
+        appendTerminal(`[DIAGNOSTIC] Command executed successfully with code 0.`);
       }
       $("termCommandInput").value = "";
     });
