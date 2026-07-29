@@ -1,314 +1,572 @@
-__author__ = 'Liam TrinhNguyen'
-__email__ = 'LiamTrinhNguyen@gmail.com'
-__version__ = 'NGS_Pipeline_v2.4'
+#!/usr/bin/env python3
+"""
+NGS_Pipeline_v2.6 – Full automated variant calling pipeline
+Author : Liam TrinhNguyen
+Email  : LiamTrinhNguyen@gmail.com
+"""
+
+__author__  = "Liam TrinhNguyen"
+__email__   = "LiamTrinhNguyen@gmail.com"
+__version__ = "NGS_Pipeline_v2.6"
 
 import os
 import sys
-import gzip
-import shutil
-import base64
 import logging
-import urllib.request
 import subprocess
-import re
 from datetime import datetime
 from pathlib import Path
+from typing import Optional, List, Tuple
+
 import polars as pl
 
-# Progress bar with ASCII fallback
+# ---------------------------------------------------------------------------
+# Optional / auto-install friendly imports
+# ---------------------------------------------------------------------------
 try:
     from tqdm import tqdm
 except ImportError:
     print("Installing tqdm...")
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "tqdm"])
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "tqdm", "--quiet"])
     from tqdm import tqdm
 
+try:
+    import requests
+except ImportError:
+    requests = None
 
-class NGSPipeline:
-    def __init__(self):
-        self.sample_id = "SRR39418081"
-        self.run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
-        self._log_dir = "logs"
-        self.results_dir = Path(f"results/run_{self.run_id}")
-        self.data_dir = Path(f"data/run_{self.run_id}")
-        self.use_local_fastq = False
-        self.logger = None
-        self.auto_mode = False
+try:
+    from Bio import Entrez, SeqIO
+    Entrez.email = "LiamTrinhNguyen@gmail.com"
+except ImportError:
+    Entrez = None
+    SeqIO = None
 
-    def _setup_logger(self) -> logging.Logger:
-        os.makedirs(self._log_dir, exist_ok=True)
-        logger_name = f"NGS_Pipeline.{self.__class__.__name__}"
-        logger = logging.getLogger(logger_name)
-        if logger.hasHandlers():
-            return logger
-        logger.propagate = False
-        logger.setLevel(logging.INFO)
-        log_path = Path(self._log_dir) / f"pipeline_{self.sample_id}_{self.run_id}.log"
-        formatter = logging.Formatter('%(asctime)s - [%(name)s] - %(levelname)s: %(message)s')
-        fh = logging.FileHandler(log_path, mode='a', encoding='utf-8', delay=False)
-        fh.setFormatter(formatter)
-        logger.addHandler(fh)
-        ch = logging.StreamHandler()
-        ch.setFormatter(formatter)
-        logger.addHandler(ch)
-        return logger
+# ---------------------------------------------------------------------------
+# Logging
+# ---------------------------------------------------------------------------
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)-8s | %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+log = logging.getLogger("NGS_Pipeline")
 
-    def log_step_analysis(self, step_num: int, title: str, analysis: str):
-        self.logger.info("=" * 80)
-        self.logger.info(f"STEP {step_num}: {title.upper()} - DETAILED ANALYSIS")
-        self.logger.info("=" * 80)
-        self.logger.info(analysis.strip())
-        self.logger.info("=" * 80 + "\n")
+# ---------------------------------------------------------------------------
+# 1. SETUP – organised directory structure
+# ---------------------------------------------------------------------------
+def setup_directories(base_dir: Path) -> dict:
+    """Create a reproducible project layout."""
+    dirs = {
+        "base":      base_dir,
+        "raw":       base_dir / "00_raw",
+        "ref":       base_dir / "01_reference",
+        "qc":        base_dir / "02_qc",
+        "aligned":   base_dir / "03_aligned",
+        "variants":  base_dir / "04_variants",
+        "annotated": base_dir / "05_annotated",
+        "reports":   base_dir / "06_reports",
+        "logs":      base_dir / "logs",
+    }
+    for d in dirs.values():
+        d.mkdir(parents=True, exist_ok=True)
+    log.info(f"Project directories created under {base_dir}")
+    return dirs
 
-    def clear_screen(self):
-        os.system('clear' if os.name == 'posix' else 'cls')
+# ---------------------------------------------------------------------------
+# Helper: run external tools safely
+# ---------------------------------------------------------------------------
+def run_cmd(cmd: List[str], log_file: Optional[Path] = None, check: bool = True) -> subprocess.CompletedProcess:
+    """Execute a shell command and optionally capture stdout/stderr to a log."""
+    log.info("CMD: " + " ".join(str(c) for c in cmd))
+    if log_file:
+        with open(log_file, "w") as fh:
+            result = subprocess.run(cmd, stdout=fh, stderr=subprocess.STDOUT, text=True)
+    else:
+        result = subprocess.run(cmd, capture_output=True, text=True)
 
-    def print_header(self, title: str):
-        print("=" * 60)
-        print(f" NGS EXPERIMENT: {title.upper()} ")
-        print("=" * 60)
+    if check and result.returncode != 0:
+        err = result.stderr or result.stdout or "No error output"
+        raise RuntimeError(f"Command failed (exit {result.returncode}):\n{err}")
+    return result
 
-    def prompt_step(self, step_num: int, title: str, description: str, command_desc: str, execution_callback):
-        self.clear_screen()
-        self.print_header(f"Step {step_num}: {title}")
-        print(f"\n* WHAT IS HAPPENING:\n{description}\n")
-        print(f"-> COMMAND:\n-> {command_desc}\n")
+# ---------------------------------------------------------------------------
+# Accession helpers
+# ---------------------------------------------------------------------------
+def process_accession(accession_id: str, dirs: dict) -> Tuple[str, List[Path]]:
+    """
+    Detect SRA vs Nuccore accession and fetch data.
+    Returns (organism_name, list_of_fastq_paths)
+    """
+    accession_id = accession_id.strip()
+    if accession_id.startswith(("SRR", "ERR", "DRR", "SAM", "PRN", "SRS", "ERS", "DRS")):
+        log.info(f"[{accession_id}] Detected SRA / Read Archive Accession")
+        return get_sra_metadata_and_fastq(accession_id, dirs["raw"])
+    else:
+        log.info(f"[{accession_id}] Detected Nuccore / Reference Accession")
+        get_ncbi_metadata(accession_id)
+        fasta = download_ncbi_fasta(accession_id, dirs["ref"] / f"{accession_id}.fasta")
+        return "unknown", [fasta]
 
-        if step_num == 1 or not self.auto_mode:
-            input("-> Press ENTER to run this step... ")
-        else:
-            print("-> Running automatically...")
+def get_ncbi_metadata(accession_id: str) -> None:
+    if Entrez is None:
+        log.warning("Biopython not available – skipping detailed metadata")
+        return
+    log.info(f"Fetching metadata for {accession_id}")
+    try:
+        handle = Entrez.esummary(db="nuccore", id=accession_id, retmode="json")
+        record = Entrez.read(handle)
+        handle.close()
+        uid = record["uids"][0]
+        doc = record[uid]
 
-        self.logger.info(f"Starting Step {step_num}: {title}")
-        print("\n-> Processing... Please wait.\n")
+        organism = doc.get("Organism", "N/A")
+        scientific_name = doc.get("ScientificName", "N/A")
+        tax_id = doc.get("TaxId", "N/A")
+        description = doc.get("Title", "N/A")
+        seq_length = doc.get("Length", "N/A")
 
-        try:
-            execution_callback()
-            self.logger.info(f"Step {step_num} completed successfully.")
-            print("\n-> STEP COMPLETED SUCCESSFULLY!")
-        except Exception as e:
-            self.logger.error(f"Error in Step {step_num}: {e}")
-            print(f"\n-> ERROR: {e}")
-            sys.exit(1)
+        seq_handle = Entrez.efetch(db="nuccore", id=accession_id, rettype="fasta", retmode="text")
+        fasta_record = SeqIO.read(seq_handle, "fasta")
+        seq_handle.close()
+        sequence = str(fasta_record.seq).upper()
+        total_len = len(sequence)
+        a = sequence.count("A")
+        c = sequence.count("C")
+        g = sequence.count("G")
+        t = sequence.count("T")
+        other = total_len - (a + c + g + t)
+        gc = ((g + c) / total_len * 100) if total_len else 0.0
 
-        if step_num == 1:
-            self.auto_mode = True
-            input("\n-> Press ENTER to continue with AUTOMATIC execution of remaining steps... ")
-        elif not self.auto_mode:
-            input("\n-> Press ENTER to continue... ")
+        print("\n" + "=" * 55)
+        print(f"METRICS & METADATA FOR: {accession_id}")
+        print("=" * 55)
+        print(f"Description     : {description}")
+        print(f"Organism        : {organism}")
+        print(f"Scientific Name : {scientific_name}")
+        print(f"Taxonomy ID     : {tax_id}")
+        print(f"Sequence Length : {seq_length:,} bp")
+        print(f"GC Content      : {gc:.2f}%")
+        print(f"Base Counts     : A:{a:,}  C:{c:,}  G:{g:,}  T:{t:,}  Other:{other:,}")
+        print("=" * 55 + "\n")
+    except Exception as e:
+        log.error(f"Metadata fetch failed: {e}")
 
-    # ====================== STEPS (unchanged) ======================
-    def run_step1(self):
-        os.makedirs('ref', exist_ok=True)
-        self.data_dir.mkdir(parents=True, exist_ok=True)
-        self.results_dir.mkdir(parents=True, exist_ok=True)
-        os.makedirs(self._log_dir, exist_ok=True)
-        self.logger.info(f"Run directories created for ID: {self.run_id}")
-        analysis = """Step 1: Workspace Setup
-Purpose: Create clean, isolated directories for this run."""
-        self.log_step_analysis(1, "Setup Directories", analysis)
+def download_ncbi_fasta(accession_id: str, output_path: Path) -> Path:
+    if Entrez is None:
+        raise RuntimeError(
+            "Biopython is required to download NCBI sequences.\n"
+            "Install it with:\n"
+            "    pip install biopython"
+        )
+    log.info(f"Downloading FASTA → {output_path}")
+    handle = Entrez.efetch(db="nuccore", id=accession_id, rettype="fasta", retmode="text")
+    data = handle.read()
+    handle.close()
+    output_path.write_text(data)
+    log.info(f"Saved {output_path}")
+    return output_path
 
-    def run_step2(self):
-        # ... (same as previous version - kept for brevity, copy from v2.3 if needed)
-        ref_fasta = Path('ref/ecoli.fna')
-        ref_gz = Path('ref/ecoli.fna.gz')
-        if not ref_fasta.exists():
-            b64_url = 'aHR0cHM6Ly9mdHAubmNiaS5ubG0ubmloLmdvdi9nZW5vbWVzL2FsbC9HQ0YvMDAwLzAwNS84NDUvR0NGXzAwMDAwNTg0NS4yX0FTTTU4NHYyL0dDRl8wMDAwMDU4NDUuMl9BU001ODR2Ml9nZW5vbWljLmZuYS5neg=='
-            url = base64.b64decode(b64_url).decode('utf-8')
-            urllib.request.urlretrieve(url, ref_gz)
-            with tqdm(total=100, desc="Unpacking reference", ncols=80, ascii=' -#') as pbar:
-                with gzip.open(ref_gz, 'rb') as f_in, open(ref_fasta, 'wb') as f_out:
-                    shutil.copyfileobj(f_in, f_out)
-                pbar.update(100)
-            ref_gz.unlink(missing_ok=True)
+def get_sra_metadata_and_fastq(run_accession: str, out_dir: Path) -> Tuple[str, List[Path]]:
+    """Fetch ENA metadata + download FASTQ via HTTPS. Returns (organism, [fastq paths])."""
+    if requests is None:
+        raise RuntimeError(
+            "The 'requests' library is required for ENA downloads.\n"
+            "Install it with:\n"
+            "    pip install requests"
+        )
 
-        with tqdm(total=2, desc="Indexing", ncols=80, ascii=' -#') as pbar:
-            subprocess.run(["bwa", "index", str(ref_fasta)], check=True)
-            pbar.update(1)
-            subprocess.run(["samtools", "faidx", str(ref_fasta)], check=True)
-            pbar.update(1)
+    url = (
+        "https://www.ebi.ac.uk/ena/portal/api/filereport?"
+        f"accession={run_accession}&result=read_run&"
+        "fields=study_accession,sample_accession,experiment_accession,"
+        "scientific_name,instrument_platform,instrument_model,"
+        "library_layout,library_strategy,read_count,base_count,fastq_ftp"
+    )
+    log.info(f"Querying ENA for {run_accession}")
+    resp = requests.get(url, timeout=90)
+    if resp.status_code != 200:
+        raise RuntimeError(f"ENA API failed: HTTP {resp.status_code}")
 
-        analysis = "Reference genome downloaded, unpacked, and indexed."
-        self.log_step_analysis(2, "Reference Genome Preparation", analysis)
+    lines = resp.text.strip().splitlines()
+    if len(lines) < 2:
+        raise RuntimeError(f"No metadata returned for {run_accession}")
 
-    def run_step3(self):
-        self.log_step_analysis(3, "Index Reference", "Indexing completed.")
+    header = lines[0].split("\t")
+    values = lines[1].split("\t")
+    data = dict(zip(header, values))
 
-    def run_step4(self):
-        if self.use_local_fastq:
-            analysis = "Using user-provided local FASTQ files."
-        else:
-            with tqdm(total=1, desc="SRA Download", ncols=80, ascii=' -#') as pbar:
-                subprocess.run(["fasterq-dump", self.sample_id, "--outdir", str(self.data_dir), "--split-files", "--force"], check=True)
-                pbar.update(1)
-            analysis = f"Downloaded {self.sample_id} from SRA."
-        self.log_step_analysis(4, "Data Input", analysis)
+    organism = data.get("scientific_name", "unknown")
+    platform = data.get("instrument_platform", "N/A")
+    model    = data.get("instrument_model", "N/A")
+    strategy = data.get("library_strategy", "N/A")
+    layout   = data.get("library_layout", "N/A")
+    reads    = data.get("read_count", "N/A")
+    bases    = data.get("base_count", "N/A")
 
-    def run_step5(self):
-        with tqdm(total=1, desc="fastp QC + Trim", ncols=80, ascii=' -#') as pbar:
-            subprocess.run([
-                "fastp", "-i", f"{self.data_dir}/{self.sample_id}_1.fastq" if not self.use_local_fastq else f"{self.data_dir}/input_1.fastq",
-                "-I", f"{self.data_dir}/{self.sample_id}_2.fastq" if not self.use_local_fastq else f"{self.data_dir}/input_2.fastq",
-                "-o", f"{self.data_dir}/trimmed_1.fastq", "-O", f"{self.data_dir}/trimmed_2.fastq",
-                "--html", str(self.results_dir / "fastp.html"),
-                "--thread", "4", "--cut_right", "--cut_window_size", "4", "--cut_mean_quality", "20", "--length_required", "50"
-            ], check=True)
-            pbar.update(1)
-        self.log_step_analysis(5, "fastp QC & Trimming", "Quality control and trimming completed.")
+    print("\n" + "=" * 60)
+    print(f"SRA METADATA & STATISTICS FOR: {run_accession}")
+    print("=" * 60)
+    print(f"Scientific Name    : {organism}")
+    print(f"Sequencing Platform: {platform} ({model})")
+    print(f"Library Strategy   : {strategy} ({layout})")
+    if str(reads).isdigit():
+        print(f"Total Reads        : {int(reads):,}")
+    if str(bases).isdigit():
+        print(f"Total Bases        : {int(bases):,}")
+    print("=" * 60 + "\n")
 
-    def run_step6(self):
-        # BWA + Samtools alignment (same as before)
-        sam_file = self.data_dir / "aligned.sam"
-        bam_file = self.data_dir / "sorted.bam"
-        with tqdm(total=3, desc="BWA + Samtools", ncols=80, ascii=' -#') as pbar:
-            with open(sam_file, "w") as f:
-                subprocess.run(["bwa", "mem", "-t", "4", "ref/ecoli.fna", 
-                                f"{self.data_dir}/trimmed_1.fastq", f"{self.data_dir}/trimmed_2.fastq"], stdout=f, check=True)
-            pbar.update(1)
-            subprocess.run(["samtools", "view", "-bS", str(sam_file), "-o", str(bam_file).replace(".bam",".temp.bam")], check=True)
-            pbar.update(1)
-            subprocess.run(["samtools", "sort", str(bam_file).replace(".bam",".temp.bam"), "-o", str(bam_file)], check=True)
-            subprocess.run(["samtools", "index", str(bam_file)], check=True)
-            pbar.update(1)
-        self.log_step_analysis(6, "Align Reads", "Reads aligned and sorted.")
+    fastq_paths = []
+    for link in data.get("fastq_ftp", "").split(";"):
+        if not link.strip():
+            continue
+        clean = link.replace("ftp://", "").strip()
+        file_url = f"https://{clean}"
+        fname = out_dir / Path(file_url).name
+        log.info(f"Downloading {fname.name} …")
 
-    def run_step7(self):
-        bcf_file = self.results_dir / "variants.bcf"
-        final_vcf = self.results_dir / "final_variants.vcf"
-        with tqdm(total=2, desc="bcftools", ncols=80, ascii=' -#') as pbar:
-            p1 = subprocess.Popen(["bcftools", "mpileup", "-f", "ref/ecoli.fna", str(self.data_dir / "sorted.bam")], stdout=subprocess.PIPE)
-            p2 = subprocess.Popen(["bcftools", "call", "-mv", "-Ob", "-o", str(bcf_file)], stdin=p1.stdout, stdout=subprocess.PIPE)
-            p1.stdout.close()
-            p2.communicate()
-            pbar.update(1)
-            with open(final_vcf, "w") as f:
-                subprocess.run(["bcftools", "view", str(bcf_file)], stdout=f, check=True)
-            pbar.update(1)
-        self.log_step_analysis(7, "Call Variants", "Variants called successfully.")
+        with requests.get(file_url, stream=True, timeout=600) as r:
+            r.raise_for_status()
+            total = int(r.headers.get("content-length", 0))
+            with open(fname, "wb") as f, tqdm(
+                total=total, unit="B", unit_scale=True, desc=fname.name, ncols=80
+            ) as bar:
+                for chunk in r.iter_content(chunk_size=1 << 20):
+                    if chunk:
+                        f.write(chunk)
+                        bar.update(len(chunk))
+        fastq_paths.append(fname)
+        log.info(f"Saved {fname}")
 
-    def run_step8(self):
-        # SnpEff annotation (kept as is)
-        self.log_step_analysis(8, "Variant Annotation", "Annotation attempted with SnpEff.")
+    if not fastq_paths:
+        raise RuntimeError(f"No FASTQ files found for {run_accession}")
 
-    def cleanup_intermediate_files(self):
-        self.logger.info("Cleaning up intermediate files...")
-        (self.data_dir / "aligned.sam").unlink(missing_ok=True)
+    return organism, fastq_paths
 
-    def display_polars_report(self):
-        vcf_path = self.results_dir / "annotated_variants.vcf"
-        if not vcf_path.exists() or vcf_path.stat().st_size == 0:
-            vcf_path = self.results_dir / "final_variants.vcf"
+# ---------------------------------------------------------------------------
+# 2. REFERENCE – organism-driven reference genome
+# ---------------------------------------------------------------------------
+def download_reference(organism: str, ref_dir: Path, force_accession: str = None) -> Path:
+    """
+    Download a suitable reference genome.
+    You can force a specific accession with force_accession.
+    """
+    if force_accession:
+        acc = force_accession.strip()
+        log.info(f"Using forced reference accession: {acc}")
+    else:
+        REF_MAP = {
+            # Bacteria
+            "Escherichia coli": "NC_000913.3",
+            "Escherichia coli K-12": "NC_000913.3",
+            "Salmonella enterica": "NC_003198.1",
+            "Staphylococcus aureus": "NC_007795.1",
+            "Mycobacterium tuberculosis": "NC_000962.3",
 
-        if not vcf_path.exists():
-            print("-> No variants file found.")
-            return
+            # Viruses – Ebola family
+            "Zaire ebolavirus": "NC_002549.1",          # Mayinga (most used)
+            "Ebola virus": "NC_002549.1",
+            "Zaire ebolavirus Mayinga": "NC_002549.1",
+            "Sudan ebolavirus": "NC_006432.1",
+            "Bundibugyo ebolavirus": "NC_014373.1",
+            "Tai Forest ebolavirus": "NC_014372.1",
+            "Reston ebolavirus": "NC_004161.1",
+            "Marburg marburgvirus": "NC_001608.3",
 
-        data_rows = []
-        columns = None
+            # Other viruses
+            "SARS-CoV-2": "NC_045512.2",
+            "Influenza A virus": "NC_002016.1",
 
-        with open(vcf_path, "r") as f:
-            for line in f:
-                if line.startswith("##"): 
-                    continue
-                if line.startswith("#CHROM"):
-                    columns = line.strip().lstrip("#").split("\t")
-                    continue
-                if line.strip():
-                    data_rows.append(line.strip().split("\t"))
+            # Eukaryotes (examples)
+            "Homo sapiens": "GCF_000001405.40",
+            "Saccharomyces cerevisiae": "GCF_000146045.2",
+        }
 
-        if not data_rows or not columns:
-            print("-> No mutations discovered.")
-            return
+        key = next((k for k in REF_MAP if k.lower() in organism.lower()), None)
 
-        df = pl.DataFrame(data_rows, schema=columns)
+        if key is None:
+            raise RuntimeError(
+                f"\nNo pre-mapped reference genome found for organism: '{organism}'.\n"
+                f"Please either:\n"
+                f"  1. Add the organism → accession mapping to REF_MAP, or\n"
+                f"  2. Force a reference with force_accession='NC_xxxxxx.x'\n"
+            )
+        acc = REF_MAP[key]
+        log.info(f"Selected reference for '{organism}': {acc}  ({key})")
 
-        # Parse INFO field into multiple columns
-        if "INFO" in df.columns:
-            info_fields = {
-                "DP": r"DP=(\d+)",
-                "VDB": r"VDB=([\d\.]+)",
-                "SGB": r"SGB=([-\d\.]+)",
-                "MQSBZ": r"MQSBZ=([\d\.]+)",
-                "MQ0F": r"MQ0F=([\d\.]+)",
-                "AC": r"AC=(\d+)",
-                "AN": r"AN=(\d+)",
-                "MQ": r"MQ=(\d+)",
-            }
-            for col, pattern in info_fields.items():
-                df = df.with_columns(pl.col("INFO").str.extract(pattern).cast(pl.Float64, strict=False).alias(col))
+    fasta = ref_dir / f"{acc}.fasta"
+    if not fasta.exists():
+        download_ncbi_fasta(acc, fasta)
+    else:
+        log.info(f"Reference already present: {fasta}")
 
-            # Keep original INFO for reference
-            df = df.with_columns(pl.col("INFO").alias("Full_INFO"))
+    return fasta
 
-        # Select useful columns for display
-        display_cols = ["CHROM", "POS", "REF", "ALT", "QUAL", "FILTER", "DP", "AC", "AN", "MQ", "VDB", "SGB", "Full_INFO"]
-        available_cols = [col for col in display_cols if col in df.columns]
-        display_df = df.select(available_cols)
+# ---------------------------------------------------------------------------
+# 3. INDEXING – BWA + samtools
+# ---------------------------------------------------------------------------
+def index_reference(fasta: Path, log_dir: Path) -> None:
+    log.info(f"Building BWA index for {fasta.name}")
+    run_cmd(["bwa", "index", str(fasta)], log_dir / "bwa_index.log")
 
-        # Log the full rich table
-        self.logger.info("=" * 100)
-        self.logger.info("FULL POLARS MUTATION TABLE WITH INFO FIELDS")
-        self.logger.info(f"Total Variants: {df.height}")
-        self.logger.info("=" * 100)
+    log.info("Building samtools faidx")
+    run_cmd(["samtools", "faidx", str(fasta)], log_dir / "samtools_faidx.log")
 
-        with pl.Config(tbl_rows=-1, tbl_cols=-1, tbl_formatting="ASCII_FULL", tbl_width_chars=120):
-            table_str = str(display_df)
-            self.logger.info(table_str)
+    dict_file = fasta.with_suffix(".dict")
+    if not dict_file.exists():
+        run_cmd(
+            ["samtools", "dict", str(fasta), "-o", str(dict_file)],
+            log_dir / "samtools_dict.log",
+        )
 
-        # Console output
-        print("\n" + "="*90)
-        print(f" POLARS MUTATION REPORT - Run {self.run_id} | Total: {df.height}")
-        print("="*90)
-        print(display_df)
+# ---------------------------------------------------------------------------
+# 5. fastp – QC + trimming + base correction
+# ---------------------------------------------------------------------------
+def run_fastp(
+    r1: Path,
+    r2: Optional[Path],
+    out_dir: Path,
+    sample: str,
+    threads: int = 4,
+) -> Tuple[Path, Optional[Path]]:
+    out_r1 = out_dir / f"{sample}_R1.trimmed.fastq.gz"
+    out_r2 = out_dir / f"{sample}_R2.trimmed.fastq.gz" if r2 else None
+    html   = out_dir / f"{sample}.fastp.html"
+    json   = out_dir / f"{sample}.fastp.json"
 
-    def run_pipeline(self):
-        self.clear_screen()
-        print("=" * 60)
-        print(" INTERACTIVE DNA VARIANT CALLING DASHBOARD ")
-        print("=" * 60)
-        print(f"\nVersion : {__version__} | Run ID: {self.run_id}\n")
+    cmd = [
+        "fastp",
+        "-i", str(r1),
+        "-o", str(out_r1),
+        "-h", str(html),
+        "-j", str(json),
+        "--correction",
+        "--thread", str(threads),
+        "--qualified_quality_phred", "20",
+        "--length_required", "30",
+    ]
+    if r2:
+        cmd.extend(["-I", str(r2), "-O", str(out_r2), "--detect_adapter_for_pe"])
+    else:
+        cmd.append("--detect_adapter_for_se")
 
-        print("1. Use NCBI SRA Database (SRR ID)")
-        print("2. Use my own local FASTQ files")
-        choice = input("\n-> Enter your choice (1 or 2): ").strip()
+    run_cmd(cmd, out_dir / f"{sample}.fastp.log")
+    return out_r1, out_r2
 
-        if choice == "1":
-            self.use_local_fastq = False
-            print("\nEnter SRA Accession ID (SRRxxxxxx) or press ENTER for default (SRR1553607)")
-            user_input = input("-> SRR ID: ").strip()
-            if user_input:
-                self.sample_id = user_input
-        elif choice == "2":
-            self.use_local_fastq = True
-            print("\nPlace your paired FASTQ files as input_1.fastq and input_2.fastq in the data folder.")
-            input("Press ENTER when ready...")
-        else:
-            print("Using default SRA mode.")
+# ---------------------------------------------------------------------------
+# 6. BWA-MEM + Samtools – alignment → sorted BAM
+# ---------------------------------------------------------------------------
+def align_and_sort(
+    ref: Path,
+    r1: Path,
+    r2: Optional[Path],
+    out_dir: Path,
+    sample: str,
+    threads: int = 8,
+) -> Path:
+    sam = out_dir / f"{sample}.sam"
+    bam = out_dir / f"{sample}.sorted.bam"
 
-        self.logger = self._setup_logger()
-        self.logger.info(f"Pipeline started | Sample: {self.sample_id} | Local: {self.use_local_fastq}")
+    bwa_cmd = [
+        "bwa", "mem",
+        "-t", str(threads),
+        "-R", f"@RG\\tID:{sample}\\tSM:{sample}\\tPL:ILLUMINA",
+        str(ref), str(r1)
+    ]
+    if r2:
+        bwa_cmd.append(str(r2))
 
-        input("\n-> Press ENTER to begin... ")
+    log.info("Running BWA-MEM")
+    with open(sam, "w") as fh:
+        subprocess.run(bwa_cmd, stdout=fh, check=True)
 
-        self.prompt_step(1, "Setup Directories", "...", "...", self.run_step1)
-        self.prompt_step(2, "Reference Genome Preparation", "...", "...", self.run_step2)
-        self.prompt_step(3, "Index Reference", "...", "...", self.run_step3)
-        self.prompt_step(4, "Data Input", "...", "...", self.run_step4)
-        self.prompt_step(5, "fastp QC & Trimming", "...", "...", self.run_step5)
-        self.prompt_step(6, "Align Reads", "...", "...", self.run_step6)
-        self.prompt_step(7, "Call Variants", "...", "...", self.run_step7)
-        self.prompt_step(8, "Annotate Variants", "...", "...", self.run_step8)
+    log.info("Sorting & indexing BAM")
+    run_cmd(["samtools", "sort", "-@", str(threads), "-o", str(bam), str(sam)])
+    run_cmd(["samtools", "index", str(bam)])
+    sam.unlink(missing_ok=True)
+    return bam
 
-        self.cleanup_intermediate_files()
+# ---------------------------------------------------------------------------
+# 7. BCFtools – variant calling
+# ---------------------------------------------------------------------------
+def call_variants(ref: Path, bam: Path, out_dir: Path, sample: str) -> Path:
+    vcf = out_dir / f"{sample}.raw.vcf.gz"
+    log.info("Calling variants with bcftools mpileup + call")
 
-        self.clear_screen()
-        self.print_header("Pipeline Completed Successfully!")
-        print(f"Run ID : {self.run_id} | Sample: {self.sample_id}")
-        print(f"Full Log: logs/pipeline_{self.sample_id}_{self.run_id}.log\n")
-        self.display_polars_report()
-        print("\nPipeline finished.\n")
+    cmd = (
+        f"bcftools mpileup -f {ref} -Ou {bam} | "
+        f"bcftools call -mv -Oz -o {vcf}"
+    )
+    run_cmd(["bash", "-c", cmd], out_dir / f"{sample}.bcftools.log")
+    run_cmd(["bcftools", "index", str(vcf)])
+    return vcf
 
+# ---------------------------------------------------------------------------
+# 8. SnpEff – functional annotation
+# ---------------------------------------------------------------------------
+def annotate_variants(vcf: Path, genome: str, out_dir: Path, sample: str) -> Path:
+    """
+    genome should be a SnpEff database name.
+    Example for Ebola: you may need to build a custom database or use a close relative.
+    """
+    ann_vcf = out_dir / f"{sample}.ann.vcf.gz"
+    log.info(f"Annotating with SnpEff ({genome})")
+
+    # Write uncompressed first
+    uncompressed = ann_vcf.with_suffix("")
+    cmd = ["snpEff", "-v", genome, str(vcf)]
+    with open(uncompressed, "w") as fh:
+        subprocess.run(cmd, stdout=fh, check=True)
+
+    run_cmd(["bgzip", "-f", str(uncompressed)])
+    run_cmd(["tabix", "-p", "vcf", str(ann_vcf)])
+    return ann_vcf
+
+# ---------------------------------------------------------------------------
+# 9. Polars – high-confidence filtering & reporting
+# ---------------------------------------------------------------------------
+def filter_and_report(vcf: Path, reports_dir: Path, sample: str, min_qual: float = 30.0) -> Path:
+    """
+    Parse VCF (annotated or raw) with Polars and produce a clean TSV report.
+    Handles both SnpEff-annotated VCFs (with INFO/ANN) and raw bcftools VCFs.
+    """
+    log.info(f"Parsing VCF with Polars: {vcf.name}")
+
+    tmp_tsv = reports_dir / f"{sample}.tmp.tsv"
+
+    # First try the annotated format
+    try:
+        run_cmd([
+            "bcftools", "query",
+            "-f", "%CHROM\t%POS\t%REF\t%ALT\t%QUAL\t%INFO/ANN\n",
+            str(vcf),
+            "-o", str(tmp_tsv),
+        ], check=True)
+        has_ann = True
+    except RuntimeError:
+        # Fall back to raw VCF format (no ANN field)
+        log.warning("No INFO/ANN field found – treating as raw (unannotated) VCF")
+        run_cmd([
+            "bcftools", "query",
+            "-f", "%CHROM\t%POS\t%REF\t%ALT\t%QUAL\n",
+            str(vcf),
+            "-o", str(tmp_tsv),
+        ])
+        has_ann = False
+
+    if has_ann:
+        df = pl.read_csv(
+            tmp_tsv,
+            separator="\t",
+            has_header=False,
+            new_columns=["CHROM", "POS", "REF", "ALT", "QUAL", "ANN"],
+            ignore_errors=True,
+        )
+        df = df.filter(pl.col("QUAL").cast(pl.Float64, strict=False) >= min_qual)
+
+        df = df.with_columns([
+            pl.col("ANN").str.split("|").list.get(1).alias("Impact"),
+            pl.col("ANN").str.split("|").list.get(3).alias("Gene"),
+            pl.col("ANN").str.split("|").list.get(9).alias("HGVS_c"),
+            pl.col("ANN").str.split("|").list.get(10).alias("HGVS_p"),
+        ]).select([
+            "CHROM", "POS", "REF", "ALT", "QUAL",
+            "Impact", "Gene", "HGVS_c", "HGVS_p"
+        ])
+    else:
+        df = pl.read_csv(
+            tmp_tsv,
+            separator="\t",
+            has_header=False,
+            new_columns=["CHROM", "POS", "REF", "ALT", "QUAL"],
+            ignore_errors=True,
+        )
+        df = df.filter(pl.col("QUAL").cast(pl.Float64, strict=False) >= min_qual)
+        # Add empty annotation columns for consistent output
+        df = df.with_columns([
+            pl.lit(None).alias("Impact"),
+            pl.lit(None).alias("Gene"),
+            pl.lit(None).alias("HGVS_c"),
+            pl.lit(None).alias("HGVS_p"),
+        ])
+
+    report = reports_dir / f"{sample}.high_confidence_variants.tsv"
+    df.write_csv(report, separator="\t")
+    log.info(f"High-confidence report written → {report}  ({df.height} variants)")
+    tmp_tsv.unlink(missing_ok=True)
+    return report
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+def main():
+    print(f"\n{'='*65}")
+    print(f"  NGS Pipeline {__version__}")
+    print(f"  Author: {__author__}  <{__email__}>")
+    print(f"{'='*65}\n")
+
+    accession = input("Accession (SRR… / NM_… / local R1.fastq.gz path): ").strip()
+    threads   = int(input("Threads to use [8]: ") or 8)
+    base_dir  = Path(input("Project output directory [./NGS_run]: ").strip() or "./NGS_run")
+
+    # Optional: force a specific reference
+    force_ref = input("Force reference accession? (leave empty for auto) : ").strip() or None
+
+    dirs = setup_directories(base_dir)
+
+    # ----- 4. Data Input -----
+    if accession.endswith((".fastq", ".fastq.gz", ".fq", ".fq.gz")):
+        r1 = Path(accession)
+        if not r1.exists():
+            raise FileNotFoundError(f"Local FASTQ not found: {r1}")
+        # simple paired-end detection
+        r2_candidates = [
+            r1.parent / r1.name.replace("_R1", "_R2").replace("_1", "_2"),
+            r1.parent / r1.name.replace("R1", "R2"),
+        ]
+        r2 = next((p for p in r2_candidates if p.exists()), None)
+        organism = "unknown"
+        sample = r1.stem.split(".")[0]
+        log.info(f"Using local FASTQ: {r1}" + (f" + {r2}" if r2 else " (single-end)"))
+    else:
+        organism, fastqs = process_accession(accession, dirs)
+        sample = accession
+        r1 = fastqs[0]
+        r2 = fastqs[1] if len(fastqs) > 1 else None
+
+    # ----- 2. Reference -----
+    ref_fasta = download_reference(organism, dirs["ref"], force_accession=force_ref)
+
+    # ----- 3. Indexing -----
+    index_reference(ref_fasta, dirs["logs"])
+
+    # ----- 5. fastp -----
+    r1_trim, r2_trim = run_fastp(r1, r2, dirs["qc"], sample, threads)
+
+    # ----- 6. Alignment -----
+    bam = align_and_sort(ref_fasta, r1_trim, r2_trim, dirs["aligned"], sample, threads)
+
+    # ----- 7. Variant calling -----
+    raw_vcf = call_variants(ref_fasta, bam, dirs["variants"], sample)
+
+    # ----- 8. Annotation -----
+    # Note: For Zaire ebolavirus you may need to build a custom SnpEff database
+    # or temporarily skip annotation.
+    snpeff_genome = "Escherichia_coli_K_12_substr_MG1655"   # change if you have a better DB
+    try:
+        ann_vcf = annotate_variants(raw_vcf, snpeff_genome, dirs["annotated"], sample)
+    except Exception as e:
+        log.warning(f"SnpEff annotation skipped ({e}). Using raw VCF for reporting.")
+        ann_vcf = raw_vcf
+
+    # ----- 9. Filtering & reporting -----
+    report = filter_and_report(ann_vcf, dirs["reports"], sample)
+
+    print("\n" + "=" * 65)
+    print("PIPELINE COMPLETED SUCCESSFULLY")
+    print(f"  BAM           : {bam}")
+    print(f"  Annotated VCF : {ann_vcf}")
+    print(f"  Final report  : {report}")
+    print("=" * 65)
 
 if __name__ == "__main__":
-    pipeline = NGSPipeline()
-    pipeline.run_pipeline()
+    main()
