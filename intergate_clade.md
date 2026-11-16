@@ -4,11 +4,17 @@
 npm install -g @anthropic-ai/claude-code
 ```
 
-access claude from terminal:
+2. access claude and setup from terminal:
 ```bash
 claude
 ```
 
 <p align="center">
-  <img src="image/clade_firstpage.png" alt="Ludo Delux" width="45%"/>
+  <img src="image/clade_firstpage.png" alt="Clade's look" width="45%"/>
 </p>
+
+This will redirection to external to complete setup
+<p align="center">
+  <img src="image/clade_login_method.png" alt="login method" width="45%"/>
+</p>
+
