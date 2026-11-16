@@ -15,6 +15,6 @@ claude
 
 This will redirection to external to complete setup
 <p align="center">
-  <img src="image/clade_login_method.png" alt="login method" width="45%"/>
+  <img src="claude_login_method.png" alt="login method" width="45%"/>
 </p>
 
