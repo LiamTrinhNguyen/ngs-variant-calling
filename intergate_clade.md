@@ -10,5 +10,5 @@ claude
 ```
 
 <p align="center">
-  <img src="image/clade_firstpage.png" alt="Ludo Delux" width="100%"/>
+  <img src="image/clade_firstpage.png" alt="Ludo Delux" width="80%"/>
 </p>
