@@ -10,11 +10,11 @@ claude
 ```
 
 <p align="center">
-  <img src="image/clade_firstpage.png" alt="Clade's look" width="45%"/>
+  <img src="image/clade_firstpage.png" alt="Clade's look" width="50%"/>
 </p>
 
 This will redirection to external to complete setup
 <p align="center">
-  <img src="image/claude_login_method.png" alt="login method" width="45%"/>
+  <img src="image/claude_login_method.png" alt="login method" width="50%"/>
 </p>
 
