@@ -1,0 +1,2 @@
+Sample,Reference,Reads_raw,Reads_after_QC,Pct_reads_kept_QC,Q30_after_QC,Mapped_reads,Pct_mapped,Mean_depth,Pct_genome_covered,Raw_calls,Flagged_LowQual,Flagged_LowDepth,Flagged_LowAF,Mixed_calls_AF_0.2_to_min,High_confidence_variants,Annotated,Host_reads_pct,Screen_best_match,Screen_matches_reference,Organisms_detected,Kraken_top_species
+SRR1553607,NC_002549.1,406890,336142,82.61,91.8,3991,1.19,15.71,98.95,559,5,408,0,0,151,False,,NC_002549.1,True,Zaire ebolavirus,

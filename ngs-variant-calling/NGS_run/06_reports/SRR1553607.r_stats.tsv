@@ -1,0 +1,13 @@
+Metric	Value	Interpretation
+Calls (all)	559	Every raw call, PASS or flagged.
+Calls (PASS)	151	Calls that passed QUAL, depth and AF filters.
+PASS variants per kb	7.96	Over a 18,959 bp genome.
+SNVs / indels (PASS)	151 / 0	Single-base changes vs insertions/deletions.
+Ts/Tv ratio (95% CI)	5.57 (3.55–9.09)	Above 0.5 (random errors): looks like real mutations.
+Median depth: PASS vs flagged	18 vs 9 (p < 1e-16)	Significantly different (Wilcoxon): the filter separates the two groups.
+Median QUAL: PASS vs flagged	225 vs 213 (p < 1e-16)	Significantly different (Wilcoxon): the filter separates the two groups.
+Spearman rho, QUAL vs depth (all calls)	0.848 (p < 1e-16)	Strong: confidence rises with depth; low-coverage regions limit calling.
+AF median (IQR), all calls	1 (1–1)	Share of reads showing the variant; ~1.0 is expected for a haploid genome.
+Calls with AF 0.2–0.8	0.0%	Low: no sign of a mixed sample.
+Even spread along genome (KS test)	D = 0.0905 (p = 0.17)	Consistent with an even spread.
+Hotspot windows (1,000 bp, BH q < 0.05)	3 of 19	Windows with more variants than chance: check genes or coverage there.
