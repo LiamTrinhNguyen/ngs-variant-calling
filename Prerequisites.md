@@ -134,6 +134,11 @@ Download the E. coli database once before running. If it is missing, annotation 
 # Download the prebuilt E. coli K-12 MG1655 annotation database (genes, transcripts, codons)
 # -v = verbose output
 snpEff download -v Escherichia_coli_K_12_substr_MG1655
+
+# Download the prebuilt Ebola Zaire virus annotation database (genes, transcripts, codons)
+# Database: ebola_zaire (based on KJ660346.1 / Makona strain)
+# -v = verbose output
+snpEff download -v ebola_zaire
 ```
 
 For other organisms, list available databases and add an `"<reference accession>": "<database>"` entry to `SNPEFF_DB` in the script:
