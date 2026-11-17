@@ -8,7 +8,7 @@
 
 | # | Read | For |
 |---|------|-----|
-| 1 | [workflow_diagram.svg](workflow_diagram.svg) | The big picture: every step and why it's there |
+| 1 | [workflow_diagram.svg](workflow_diagram.svg) | The big picture|
 | 2 | [Prerequisites.md](Prerequisites.md) | One-time install (Miniforge, the `ngs-env` environment, SnpEff database) |
 | 3 | [workflow_run.md](workflow_run.md) | How to run it and fix common problems |
 | 4 | [reading_results.md](reading_results.md) | How to read the dashboard and judge a sample, with a worked example |
