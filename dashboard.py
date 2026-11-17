@@ -220,6 +220,69 @@ def _r_stats(run_dir: Path, name: str):
     return {"stats": stats.to_dicts(), "windows": windows.to_dicts()}
 
 
+# ---- sample checks (steps 5b–5d): host removal, reference screen, Kraken2 ----
+CONTROL_FOLD = 10   # a finding needs ≥ 10× the negative control's reads per million to count
+TOP_SPECIES = 15    # Kraken2/Bracken species kept per sample (page and CSV)
+
+
+def _host(run_dir: Path, name: str):
+    """02_qc/<sample>.host_removal.json, or None when host removal was off."""
+    f = run_dir / "02_qc" / f"{name}.host_removal.json"
+    return json.loads(f.read_text()) if f.exists() else None
+
+
+def _screen(run_dir: Path, name: str):
+    """Rows of 02_qc/<sample>.reference_screen.tsv (None when the screen was off)."""
+    f = run_dir / "02_qc" / f"{name}.reference_screen.tsv"
+    if not f.exists():
+        return None
+    ints = {"Reads", "Distant_reads", "Spread", "Distant_spread", "Sampled_reads"}
+    rows = []
+    for r in _report_rows(f):
+        rows.append({k: (_num(v, int, 0) if k in ints else
+                         _num(v) if k in ("Shared_reads", "Evenness", "Distant_evenness",
+                                          "Mean_identity", "Reads_per_million") else v)
+                     for k, v in r.items()})
+    return rows
+
+
+def _kraken(run_dir: Path, name: str):
+    """Kraken2 report + Bracken species table → total, unclassified, top species."""
+    rep = run_dir / "02_qc" / f"{name}.kraken2.report"
+    sp = run_dir / "02_qc" / f"{name}.bracken_species.tsv"
+    if not rep.exists():
+        return None
+    total = unclassified = 0
+    for line in rep.read_text().splitlines():
+        f = line.split("\t")
+        if len(f) >= 6 and f[3] in ("U", "R"):
+            total += int(f[1])
+            if f[3] == "U":
+                unclassified = int(f[1])
+    species = []
+    if sp.exists():
+        for r in _report_rows(sp):
+            reads = _num(r.get("new_est_reads"), int, 0)
+            species.append({"name": r["name"], "taxid": r.get("taxonomy_id"), "reads": reads,
+                            "fraction": _num(r.get("fraction_total_reads")),
+                            "rpm": round(1e6 * reads / total, 1) if total else 0.0})
+    species.sort(key=lambda x: -x["reads"])
+    return {"total": total, "unclassified": unclassified,
+            "unclassified_pct": round(100 * unclassified / total, 2) if total else None,
+            "species": species[:TOP_SPECIES]}
+
+
+def _compare_with_controls(items, control_items, key, rpm):
+    """Add Control_RPM / Ratio / In_control to each finding.
+    WHY: reagents and the lab carry their own DNA; a finding only counts if it
+         is clearly (≥ CONTROL_FOLD ×) above what the negative controls show."""
+    for it in items:
+        ctrl = max((rpm(c) for c in control_items if key(c) == key(it)), default=0.0)
+        it["control_rpm"] = ctrl
+        it["ratio"] = round(rpm(it) / ctrl, 1) if ctrl else None
+        it["in_control"] = bool(ctrl) and rpm(it) < CONTROL_FOLD * ctrl
+
+
 def _report_rows(tsv: Path):
     with open(tsv, newline="") as fh:
         return list(csv.DictReader(fh, delimiter="\t"))
@@ -228,7 +291,7 @@ def _report_rows(tsv: Path):
 # ---------------------------------------------------------------------------
 # Collect all samples in a run folder
 # ---------------------------------------------------------------------------
-def collect(run_dir: Path, min_qual: float, min_dp: int, min_af: float, only=None):
+def collect(run_dir: Path, min_qual: float, min_dp: int, min_af: float, only=None, controls=None):
     ref = _reference_info(run_dir)
     offsets, off = {}, 0
     for c in ref["contigs"]:
@@ -257,7 +320,21 @@ def collect(run_dir: Path, min_qual: float, min_dp: int, min_af: float, only=Non
             "variants": variants,
             "annotated": any(v.get("Effect") for v in variants),
             "r": _r_stats(run_dir, name),
+            "host": _host(run_dir, name),
+            "screen": _screen(run_dir, name),
+            "kraken": _kraken(run_dir, name),
         })
+    # Negative controls: QC and sample checks only (they are never variant-called)
+    ctrl = [{"name": c, "qc": _fastp(run_dir / "02_qc" / f"{c}.fastp.json"), "host": _host(run_dir, c),
+             "screen": _screen(run_dir, c), "kraken": _kraken(run_dir, c)} for c in (controls or [])]
+    ctrl_screen = [r for c in ctrl for r in (c["screen"] or [])]
+    ctrl_species = [x for c in ctrl for x in ((c["kraken"] or {}).get("species") or [])]
+    if ctrl:
+        for smp in samples:
+            _compare_with_controls(smp["screen"] or [], ctrl_screen,
+                                   key=lambda r: r["Reference"], rpm=lambda r: r["Reads_per_million"] or 0.0)
+            _compare_with_controls((smp["kraken"] or {}).get("species") or [], ctrl_species,
+                                   key=lambda x: x["taxid"], rpm=lambda x: x["rpm"] or 0.0)
     return {
         "run": str(run_dir.resolve()),
         "generated": datetime.now().strftime("%Y-%m-%d %H:%M"),
@@ -265,6 +342,8 @@ def collect(run_dir: Path, min_qual: float, min_dp: int, min_af: float, only=Non
         "offsets": offsets,
         "thresholds": t,
         "samples": samples,
+        "controls": ctrl,
+        "control_fold": CONTROL_FOLD,
     }
 
 
@@ -282,7 +361,9 @@ def build_tables(data):
     summary_cols = ["Sample", "Reference", "Reads_raw", "Reads_after_QC", "Pct_reads_kept_QC",
                     "Q30_after_QC", "Mapped_reads", "Pct_mapped", "Mean_depth",
                     "Pct_genome_covered", "Raw_calls", "Flagged_LowQual", "Flagged_LowDepth",
-                    "Flagged_LowAF", "Mixed_calls_AF_0.2_to_min", "High_confidence_variants", "Annotated"]
+                    "Flagged_LowAF", "Mixed_calls_AF_0.2_to_min", "High_confidence_variants", "Annotated",
+                    "Host_reads_pct", "Screen_best_match", "Screen_matches_reference",
+                    "Organisms_detected", "Kraken_top_species"]
     summary_rows = []
     for s in data["samples"]:
         qc, al, cv = s["qc"] or {}, s["align"] or {}, s["cov"] or {}
@@ -301,6 +382,7 @@ def build_tables(data):
             round(cv.get("meandepth", 0), 2), round(cv.get("covered_pct", 0), 2),
             len(calls), reason("LowQual"), reason("LowDepth"), reason("LowAF"), mixed,
             len(s["variants"]), s["annotated"],
+            *_check_summary(s, data["reference"]["accession"]),
         ])
     var_cols = ["Sample", "CHROM", "POS", "REF", "ALT", "QUAL", "DP", "AF",
                 "Effect", "Impact", "Gene", "HGVS_c", "HGVS_p"]
@@ -318,13 +400,43 @@ def build_tables(data):
     w_cols = ["Sample", "Window_start", "Window_end", "Variants", "Expected", "P_value", "Q_value", "Hotspot"]
     w_rows = [[s["name"]] + [w.get(c) for c in w_cols[1:]]
               for s in data["samples"] if s.get("r") for w in s["r"]["windows"]]
+    # Sample checks, long format, samples AND negative controls
+    sc_cols = ["Sample", "Is_control", "Organism", "Reference", "Kind", "Reads", "Shared_reads",
+               "Distant_reads", "Spread", "Evenness", "Distant_spread", "Distant_evenness",
+               "Mean_identity", "Reads_per_million", "Control_RPM", "Fold_over_control", "Status"]
+    ctrl_names = {c["name"] for c in data["controls"]}
+    sc_rows = [[x["name"], x["name"] in ctrl_names] + [r.get(c) for c in sc_cols[2:14]] +
+               [r.get("control_rpm"), r.get("ratio"),
+                r["Status"] + (" (also in control)" if r.get("in_control") and r["Status"] == "detected" else "")]
+               for x in data["samples"] + data["controls"] for r in (x.get("screen") or [])]
+    tx_cols = ["Sample", "Is_control", "Species", "Taxid", "Reads", "Fraction_of_classified",
+               "Reads_per_million", "Control_RPM", "Fold_over_control", "In_control"]
+    tx_rows = [[x["name"], x["name"] in ctrl_names, sp["name"], sp["taxid"], sp["reads"], sp["fraction"],
+                sp["rpm"], sp.get("control_rpm"), sp.get("ratio"), sp.get("in_control")]
+               for x in data["samples"] + data["controls"] for sp in ((x.get("kraken") or {}).get("species") or [])]
     return {
         "summary":  {"file": "sample_summary.csv",       "label": "Sample summary",           "columns": summary_cols, "rows": summary_rows},
         "variants": {"file": "all_samples_variants.csv", "label": "Trusted variants (PASS)",  "columns": var_cols,     "rows": var_rows},
         "calls":    {"file": "all_samples_calls.csv",    "label": "All calls + filter reason", "columns": call_cols,    "rows": call_rows},
         "rstats":   {"file": "r_statistics.csv",         "label": "R statistics",              "columns": r_cols,       "rows": r_rows},
         "windows":  {"file": "variant_windows.csv",      "label": "Hotspot windows (R)",       "columns": w_cols,       "rows": w_rows},
+        "screen":   {"file": "reference_screen.csv",     "label": "Reference screen",          "columns": sc_cols,      "rows": sc_rows},
+        "taxonomy": {"file": "taxonomy.csv",             "label": "Kraken2 species",           "columns": tx_cols,      "rows": tx_rows},
     }
+
+
+def _check_summary(s, reference):
+    """Host_reads_pct, Screen_best_match, Screen_matches_reference,
+    Organisms_detected, Kraken_top_species for the summary table."""
+    host = (s.get("host") or {}).get("host_pct")
+    screen = s.get("screen")
+    detected = [r for r in (screen or []) if r["Status"] == "detected" and not r.get("in_control")]
+    best = detected[0]["Reference"] if detected else ("none" if screen else None)
+    matches = (best == reference) if screen else None
+    species = [x for x in ((s.get("kraken") or {}).get("species") or []) if not x.get("in_control")]
+    return [host, best, matches,
+            "; ".join(r["Organism"] for r in detected) if screen else None,
+            species[0]["name"] if species else None]
 
 
 def write_csvs(tables, out_dir: Path):
@@ -343,16 +455,19 @@ def write_csvs(tables, out_dir: Path):
 # Build everything
 # ---------------------------------------------------------------------------
 def build_dashboard(run_dir, min_qual: float = 30.0, min_dp: int = 15, min_af: float = 0.8,
-                    samples=None) -> Path:
+                    samples=None, controls=None) -> Path:
     """Write 07_dashboard/ (HTML + CSVs) for a run folder; returns the HTML path.
 
-    samples: optional list of sample names to include (default: every sample
-             with a report in 06_reports/).
+    samples:  optional list of sample names to include (default: every sample
+              with a report in 06_reports/).
+    controls: names of negative-control samples (QC + checks only); every
+              finding is compared with them.
     """
     run_dir = Path(run_dir)
     out_dir = run_dir / "07_dashboard"
     out_dir.mkdir(parents=True, exist_ok=True)
-    data = collect(run_dir, min_qual, min_dp, min_af, only=set(samples) if samples else None)
+    data = collect(run_dir, min_qual, min_dp, min_af, only=set(samples) if samples else None,
+                   controls=controls)
     data["tables"] = build_tables(data)       # shown in the page's "Data tables" section
     write_csvs(data["tables"], out_dir)        # the same rows, saved for Power BI / Excel
     # WHY escape "</": stops sample text from closing the <script> tag early
@@ -446,6 +561,8 @@ HTML_TEMPLATE = r"""<!doctype html>
   .tabs button[aria-selected="true"] { background: var(--accent-wash); color: var(--text); font-weight: 600; }
   footer { color: var(--muted); font-size: 12px; margin-top: 24px; }
   code { font-size: 12px; }
+  .h3 { margin: 0 0 2px; font-size: 13px; }
+  td.cellwrap { white-space: normal; }
 </style>
 </head>
 <body>
@@ -481,6 +598,30 @@ HTML_TEMPLATE = r"""<!doctype html>
       <p class="sub" id="funnelSub"></p>
       <div class="chart" id="funnel"></div>
     </div>
+  </div>
+
+  <div class="card" id="idCard">
+    <h2>Sample identity &amp; contamination</h2>
+    <p class="sub" id="idSub"></p>
+    <ul class="checks" id="idChecks"></ul>
+    <div class="grid2" style="margin-top:14px">
+      <div id="scrBox">
+        <h3 class="h3">Reference screen</h3>
+        <p class="sub" id="scrSub"></p>
+        <div class="table-wrap"><table id="scrTable"></table></div>
+      </div>
+      <div id="krBox">
+        <h3 class="h3">Kraken2 / Bracken species</h3>
+        <p class="sub" id="krSub"></p>
+        <div class="table-wrap"><table id="krTable"></table></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" id="ctrlCard">
+    <h2>Negative controls</h2>
+    <p class="sub" id="ctrlSub"></p>
+    <div class="table-wrap"><table id="ctrlTable"></table></div>
   </div>
 
   <div class="card">
@@ -634,10 +775,10 @@ function renderMeta() {
   $("meta").textContent = `${DATA.samples.length} sample${DATA.samples.length === 1 ? "" : "s"} · reference ${r.accession}` +
     (r.description ? ` (${r.description.replace(r.accession, "").trim()})` : "") +
     ` · ${fmt(len)} bp · generated ${DATA.generated}`;
+  const files = Object.values(DATA.tables || {}).map(t => `<code>${esc(t.file)}</code>`);
   $("foot").innerHTML = `Run folder: <code>${esc(DATA.run)}</code><br>` +
     `CSV files for Power BI / Excel are saved next to this page in <code>07_dashboard/</code>: ` +
-    `<code>sample_summary.csv</code>, <code>all_samples_variants.csv</code>, <code>all_samples_calls.csv</code>, ` +
-    `<code>r_statistics.csv</code> and <code>variant_windows.csv</code>.`;
+    files.slice(0, -1).join(", ") + " and " + files.slice(-1) + ".";
   const sel = $("sampleSel");
   sel.innerHTML = DATA.samples.map((s, i) => `<option value="${i}">${esc(s.name)}</option>`).join("");
   sel.onchange = () => select(+sel.value);
@@ -652,7 +793,8 @@ function renderSamplesTable() {
     ["Genome covered", s => pct(s.cov?.covered_pct), "num"],
     ["Raw calls", s => fmt(s.calls.length), "num"],
     ["Trusted variants", s => fmt(s.variants.length), "num"],
-    ["Status", s => statusBadge(checks(s)), ""],
+    ["Best match (screen)", s => esc(bestMatch(s)?.Organism ?? (s.screen ? "none" : "–")), ""],
+    ["Status", s => statusBadge([...checks(s), ...idChecks(s)]), ""],
   ];
   $("samplesTable").innerHTML =
     "<thead><tr>" + cols.map(c => `<th class="${c[2]}">${c[0]}</th>`).join("") + "</tr></thead><tbody>" +
@@ -696,6 +838,88 @@ function statusBadge(list) {
   return bad ? `<span class="badge"><span class="dot" style="background:${C.warning}"></span>${bad} warning${bad > 1 ? "s" : ""}</span>`
              : `<span class="badge"><span class="dot" style="background:${C.good}"></span>All checks passed</span>`;
 }
+// ===================== sample identity & contamination (steps 5b–5d) =====================
+// WHY: the variant list is only meaningful if the reads come from the reference
+//      genome. The screen (fixed list, ranked by how evenly reads cover each
+//      genome), Kraken2 (open-world) and the negative controls answer that.
+const bestMatch = s => (s.screen || []).find(r => r.Status === "detected" && !r.in_control);
+function idChecks(s) {
+  const out = [], ref = DATA.reference.accession;
+  if (s.host) out.push({ok: true, name: "Host reads removed", value: pct(s.host.host_pct),
+    why: `${fmt(s.host.host_reads)} of ${fmt(s.host.reads_in)} reads matched the host genome and were removed before alignment.`});
+  if (s.screen) {
+    const det = s.screen.filter(r => r.Status === "detected" && !r.in_control);
+    const best = det[0], self = s.screen.find(r => r.Reference === ref);
+    out.push({ok: !!best && best.Reference === ref, name: "Reads match the reference",
+      value: best ? best.Organism : "nothing detected",
+      why: !best ? "No built-in genome is covered evenly by the reads. The organism is probably not in the list – check Kraken2 or give its reference." :
+           best.Reference === ref ? `${fmt(best.Reads)} reads cover ${best.Spread}/100 of the genome evenly (evenness ${best.Evenness}).` :
+           `The reads match ${best.Organism} (${best.Reference}) better than the reference used (${ref}${self ? ", spread " + self.Spread + "/100" : ""}). The variants may be meaningless.`});
+    if (det.length > 1) out.push({ok: false, name: "More than one organism", value: det.length,
+      why: "Several genomes are covered evenly: " + det.map(r => r.Organism).join(", ") + ". Possible mixed infection or contamination."});
+    s.screen.filter(r => r.Status === "divergent?").forEach(r => out.push({ok: false, name: "Divergent relative", value: r.Organism,
+      why: `${fmt(r.Distant_reads)} reads match ${r.Organism} at only 85–95 % identity, all along the genome: a divergent strain or a relative not in the list.`}));
+    const ctl = s.screen.filter(r => r.Status === "detected" && r.in_control);
+    if (ctl.length) out.push({ok: false, name: "Also in the negative control", value: ctl.map(r => r.Organism).join(", "),
+      why: `Less than ${DATA.control_fold}× the reads per million of the control – likely contamination, not from the sample.`});
+  }
+  if (s.kraken) {
+    const sp = (s.kraken.species || []).filter(x => !x.in_control);
+    if (sp.length) out.push({ok: true, name: "Most abundant species (Kraken2)", value: sp[0].name,
+      why: `${fmt(sp[0].reads)} reads (${pct(100 * (sp[0].fraction || 0))} of classified). ${pct(s.kraken.unclassified_pct)} of reads were not classified by this database.`});
+  }
+  return out;
+}
+const checkItem = c => `<li><span class="badge"><span class="dot" style="background:${c.ok ? C.good : C.warning}"></span>${c.ok ? "✓" : "!"} ${esc(String(c.value))}</span>` +
+  `<div><b>${esc(c.name)}</b><div class="why">${esc(c.why)}</div></div></li>`;
+function renderIdentity() {
+  const s = S(), card = $("idCard");
+  card.hidden = !(s.screen || s.kraken || s.host);
+  if (card.hidden) return;
+  const parts = [s.host && "host removal", s.screen && "reference screen", s.kraken && "Kraken2"].filter(Boolean);
+  $("idSub").textContent = `Is this the organism you think it is, and is anything else in the sample? From: ${parts.join(", ")}` +
+    (DATA.controls.length ? `, compared with ${DATA.controls.length} negative control${DATA.controls.length > 1 ? "s" : ""}.` : ".");
+  $("idChecks").innerHTML = idChecks(s).map(checkItem).join("");
+  const ctl = DATA.controls.length > 0;
+  $("scrBox").hidden = !s.screen;
+  if (s.screen) {
+    const rows = s.screen.filter(r => r.Status !== "–" || r.Reads > 0 || r.Distant_reads > 0);
+    $("scrSub").textContent = `${fmt(s.screen[0]?.Sampled_reads)} reads mapped against every built-in genome. Spread = stretches of 100 with a read; evenness ≈ 1 means reads all along the genome.`;
+    $("scrTable").innerHTML = "<thead><tr><th>Organism</th><th class='num'>Reads</th><th class='num'>Spread</th><th class='num'>Evenness</th>" +
+      (ctl ? "<th class='num'>× control</th>" : "") + "<th>Status</th></tr></thead><tbody>" +
+      (rows.length ? rows.map(r => `<tr><td class="cellwrap">${esc(r.Organism)}<br><span class="why" style="color:var(--muted)">${esc(r.Reference)}</span></td>` +
+        `<td class="num">${fmt(Math.round(r.Reads + (r.Shared_reads || 0)))}</td><td class="num">${r.Spread}/100</td><td class="num">${r.Evenness ?? "–"}</td>` +
+        (ctl ? `<td class="num">${r.control_rpm ? (r.ratio + "×") : "–"}</td>` : "") +
+        `<td>${esc(r.Status)}${r.in_control ? " · in control" : ""}</td></tr>`).join("")
+        : `<tr><td colspan="6" class="empty">No reads matched any built-in genome.</td></tr>`) + "</tbody>";
+  }
+  $("krBox").hidden = !s.kraken;
+  if (s.kraken) {
+    const sp = s.kraken.species || [];
+    $("krSub").textContent = `${fmt(s.kraken.total)} reads classified against the Kraken2 database; ${pct(s.kraken.unclassified_pct)} unclassified. Top ${sp.length} species (Bracken estimates).`;
+    $("krTable").innerHTML = "<thead><tr><th>Species</th><th class='num'>Reads</th><th class='num'>% classified</th>" +
+      (ctl ? "<th class='num'>× control</th>" : "") + "</tr></thead><tbody>" +
+      (sp.length ? sp.map(x => `<tr${x.in_control ? ' style="opacity:.55"' : ""}><td class="cellwrap">${esc(x.name)}${x.in_control ? " · in control" : ""}</td>` +
+        `<td class="num">${fmt(x.reads)}</td><td class="num">${pct(100 * (x.fraction || 0))}</td>` +
+        (ctl ? `<td class="num">${x.control_rpm ? (x.ratio + "×") : "–"}</td>` : "") + "</tr>").join("")
+        : `<tr><td colspan="4" class="empty">No species-level hits.</td></tr>`) + "</tbody>";
+  }
+}
+function renderControls() {
+  const card = $("ctrlCard");
+  card.hidden = !DATA.controls.length;
+  if (card.hidden) return;
+  $("ctrlSub").textContent = `Negative controls (e.g. extraction blanks) go through QC and the sample checks only. ` +
+    `A finding in a sample counts only if it has at least ${DATA.control_fold}× the reads per million seen in the controls.`;
+  $("ctrlTable").innerHTML = "<thead><tr><th>Control</th><th class='num'>Reads after QC</th><th>Screen: detected</th><th>Kraken2: top species</th></tr></thead><tbody>" +
+    DATA.controls.map(c => {
+      const det = (c.screen || []).filter(r => r.Status === "detected").map(r => r.Organism);
+      const sp = ((c.kraken || {}).species || []).slice(0, 3).map(x => `${x.name} (${fmt(x.reads)})`);
+      return `<tr><td>${esc(c.name)}</td><td class="num">${fmt(c.qc?.reads_pass)}</td>` +
+        `<td class="cellwrap">${c.screen ? esc(det.join(", ") || "nothing") : "–"}</td><td class="cellwrap">${c.kraken ? esc(sp.join(", ") || "nothing") : "–"}</td></tr>`;
+    }).join("") + "</tbody>";
+}
+
 function renderChecks() {
   const list = checks(S());
   const ann = S().annotated
@@ -1094,12 +1318,13 @@ function renderWindows() {
 function renderCharts() { renderFunnel(); renderCoverage(); renderScatter(); renderTypes(); renderAF(); renderReasons(); renderWindows(); }
 function select(i) {
   current = i; $("sampleSel").value = i;
-  renderSamplesTable(); renderTiles(); renderChecks(); renderCharts(); renderVariants(); renderSettings(); renderR();
+  renderSamplesTable(); renderTiles(); renderChecks(); renderIdentity(); renderCharts(); renderVariants(); renderSettings(); renderR();
 }
 if (!DATA.samples.length) {
   document.querySelector(".wrap").insertAdjacentHTML("beforeend", '<p class="empty">No finished samples found (no files in 06_reports/).</p>');
 } else {
   renderMeta();
+  renderControls();
   if (DATA.samples.length < 2) $("samplesCard").hidden = true;
   select(0);
   renderDataTable();
@@ -1121,6 +1346,7 @@ if __name__ == "__main__":
     p.add_argument("--min-qual", type=float, default=30.0)
     p.add_argument("--min-dp", type=int, default=15)
     p.add_argument("--min-af", type=float, default=0.8)
+    p.add_argument("--controls", nargs="*", default=None, help="negative-control sample names")
     a = p.parse_args()
-    out = build_dashboard(Path(a.run_dir), a.min_qual, a.min_dp, a.min_af)
+    out = build_dashboard(Path(a.run_dir), a.min_qual, a.min_dp, a.min_af, controls=a.controls)
     print(f"Dashboard written → {out}")

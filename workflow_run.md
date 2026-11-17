@@ -51,7 +51,20 @@ The script asks **4 questions**. Type an answer and press **Enter** (press Enter
       • SRA run accession      e.g. SRR1553607
       • Local R1 FASTQ path    e.g. /workspaces/data/my_sample_R1.fastq.gz
                                (R2 is auto-detected: _R1→_R2 or _1→_2)
+      An accession is looked up on ENA right away (needs internet);
+      a file is read once for a summary.
       Accession or path: SRR1553607
+      Looking up SRR1553607 on ENA …
+
+      ✓ Found on ENA: SRR1553607
+        Organism   Zaire ebolavirus
+        Layout     PAIRED (R1 + R2)
+        Reads      203,445 · Illumina HiSeq 2500
+        Bases      41,095,890 bp
+        Library    RNA-Seq
+        Download   30.1 MB in 2 file(s)
+        Study      PRJNA257197
+        Reference  NC_002549.1 (Zaire ebolavirus) – used if you press Enter at question 4
 
 [2/4] CPU threads – this machine has 2 cores
       e.g. 4   (press Enter for default 8)
@@ -64,18 +77,81 @@ The script asks **4 questions**. Type an answer and press **Enter** (press Enter
 [4/4] Reference genome accession (RefSeq) – optional for SRA, REQUIRED for local FASTQ
       e.g. NC_002549.1 (Zaire ebolavirus)   NC_000913.3 (E. coli K-12)
            NC_045512.2 (SARS-CoV-2)         NC_003198.1 (Salmonella enterica)
-      Press Enter to auto-select from the SRA organism name.
-      Reference accession: NC_002549.1
+      Type  list  to see all built-in references, then pick one by number,
+      or  0  to test your reads against all of them and get the best match.
+      Press Enter to use NC_002549.1 (Zaire ebolavirus), matched from the organism 'Zaire ebolavirus'.
+      Reference accession:
+      Gene annotation: skipped – no SnpEff database for this reference (variants are still reported)
 ```
+
+For a **local FASTQ** at question 1, the script reads the file once (about 1 second per 15 MB `.gz`) and prints a summary of R1 and of R2 if it finds one. It also warns if R1 and R2 have different read counts. Files over 300 MB are sampled (first 1,000,000 reads) and the totals shown with `≈`.
+
+```text
+      ✓ R1: SRR1553607_1.fastq.gz (15.0 MB)
+        Reads      203,445
+        Bases      20,547,945 bp
+        Length     101 bp (mean 101.0)
+        GC         58.8 %
+        Quality    mean Q33.4 · 85.9 % of bases ≥ Q30
+        First read SRR1553607.1
+      ✓ R2: SRR1553607_2.fastq.gz (15.1 MB)
+        …
+      Sample name: SRR1553607  (used in the output file names)
+```
+
+At question 4, type `list` to see every built-in reference (numbered, with which ones have gene annotation), then type a number or an accession:
+
+```text
+      Reference accession: list
+
+      Built-in references – type the number or the accession:
+         1. NC_000913.3        Escherichia coli             with gene annotation (SnpEff)
+         2. NC_003198.1        Salmonella enterica
+         …
+         5. NC_002549.1        Zaire ebolavirus
+         …
+        13. GCF_000001405.40   Homo sapiens                 can't be downloaded yet (assembly)
+      Reference accession: 5
+      → NC_002549.1 (Zaire ebolavirus)
+      ✓ NC_002549.1: Zaire ebolavirus isolate Ebola virus/H.sapiens-tc/COD/1976/Yambuku-Mayinga, complete genome (18,959 bp)
+```
+
+**Not sure which reference fits? Type `0` (or `all`).** The script maps a sample of your reads against **every** built-in reference at once and suggests the best one. Press Enter afterwards to use it:
+- For local files, it uses the first 50,000 reads of R1.
+- For an SRA run, it streams the first 50,000 reads from ENA, so the whole file isn't downloaded.
+- The first time, it downloads the 12 references (about 17 MB) and indexes them (about 1 minute) into `~/.cache/ngs_pipeline/reference_screen/`. Set `NGS_SCREEN_CACHE` to use another folder. After that it takes about 10 seconds.
+
+```text
+      Reference accession: 0
+      Reference screen: 50,000 reads of SRR1553607
+          Reference          Organism                       Reads   Spread
+        ★ NC_002549.1        Zaire ebolavirus                  39   32/100
+          NC_000962.3        Mycobacterium tuberculosis        68    2/100  piled up (conserved genes?)
+          NC_000913.3        Escherichia coli                   1    1/100
+          …
+          no close match                                   49,890
+      Best match: NC_002549.1 (Zaire ebolavirus), 39 reads over 32/100 of the genome.
+      Press Enter to use NC_002549.1, or type another number or accession.
+```
+
+How to read it:
+- **Reads:** how many reads align closely to that reference. To count, a read must be placed uniquely, with at least 80% of it aligned and at most 5% mismatches.
+- **Spread:** how many of 100 equal stretches along that genome got at least one read. This decides the ranking. The genome your sample really comes from gets reads all along it.
+- **"Piled up":** many reads, but only a few stretches. These are reads landing on genes that are shared across many species, such as ribosomal RNA, often from contaminating bacteria. On SRR1553607, 68 reads hit M. tuberculosis, but all of them fall in 2 of its 100 stretches (its rRNA genes), while Ebola's 39 reads cover 32 stretches.
+- **A low percentage for the winner is normal** in clinical samples, where most reads are host reads. If no reference reaches 5 stretches, the organism is probably not in the list, and you need to type its accession.
+
+A typed accession is checked on NCBI before the run starts. If it doesn't exist, or it's a `GCF_` assembly, the question is asked again. If it differs from the reference usually used for the sample's organism, you get a warning.
 
 | # | Question | What to type | Example |
 |---|----------|--------------|---------|
-| 1 | `Accession or path:` | An SRA run accession (SRR/ERR/DRR) **or** the path to your local R1 FASTQ. Required: an empty answer is asked again | `SRR1553607` |
+| 1 | `Accession or path:` | An SRA run accession (SRR/ERR/DRR) **or** the path to your local R1 FASTQ. An accession is looked up on ENA and a file is summarised straight away. Asked again if empty, if ENA has no such run, if the file doesn't exist or isn't FASTQ, or if it's a genome accession such as `NC_…` | `SRR1553607` |
 | 2 | `Threads [8]:` | A positive whole number, up to the core count shown. Invalid input is asked again | `4` |
 | 3 | `Output directory [./NGS_run]:` | The folder for all results | `./NGS_run` |
-| 4 | `Reference accession:` | A RefSeq accession, or Enter to pick it automatically from the organism | `NC_002549.1` |
+| 4 | `Reference accession:` | A RefSeq accession, a number from `list`, or Enter to use the one matched from the organism (shown above the prompt). Required for local FASTQ. Checked on NCBI; asked again if it doesn't exist | `NC_002549.1`, `list`, `5` |
 
-> **Tip:** if you leave question 4 empty, the reference is picked from the organism name in the ENA metadata using `REF_MAP` (E. coli, Salmonella, S. aureus, M. tuberculosis, Ebola, SARS-CoV-2, …). If the organism isn't in the list, the script stops and asks you to force a reference.
+> **Tip:** if you leave question 4 empty, the reference is picked from the organism name in the ENA metadata using `REF_MAP` (E. coli, Salmonella, S. aureus, M. tuberculosis, Ebola, SARS-CoV-2, …). If the organism isn't in the list, question 4 says so and won't accept an empty answer. Type `list` to see the built-in references, or `0` to let your reads decide.
+
+> **No internet?** The ENA lookup prints "Couldn't reach ENA" and the script carries on, but step 4 (downloading reads) needs internet anyway. Local FASTQ files are summarised offline. The reference check is skipped (with a note) if NCBI can't be reached.
 
 ## 5. Example runs
 
@@ -128,15 +204,63 @@ printf 'SRR1553607\n4\n./NGS_run\nNC_002549.1\n' | python3 run_interactive_pipel
 | Download reads | `00_raw/` | requests (ENA) | `<SRR>_1.fastq.gz`, `<SRR>_2.fastq.gz` (plus `<SRR>.fastq.gz` if ENA lists unpaired reads; it's downloaded but not used) |
 | Reference + index | `01_reference/` | Biopython, bwa, samtools | `<ACC>.fasta` + `.bwt/.fai/.dict` index files |
 | QC & trimming | `02_qc/` | fastp | `*_R1/R2.trimmed.fastq.gz`, `*.fastp.html`, `*.fastp.json` |
+| Host removal (5b, optional) | `02_qc/` | bwa mem, samtools | `*_R1/R2.host_removed.fastq.gz` (used from here on), `*.host_removal.json` |
+| Reference screen (5c) | `02_qc/` | bwa mem | `*.reference_screen.tsv`: one row per built-in genome (see [Sample checks](#6b-sample-checks-screen-host-removal-kraken2-controls)) |
+| Classification (5d, optional) | `02_qc/` | Kraken2 + Bracken | `*.kraken2.report`, `*.bracken_species.tsv` |
 | Alignment | `03_aligned/` | bwa mem, samtools | `*.sorted.bam`, `*.sorted.bam.bai` |
 | Variant calling | `04_variants/` | bcftools mpileup (`-q 20 -Q 20 -d 10000`) → call (`--ploidy 1`) → norm | `*.raw.vcf.gz` (+ `.csi`), `*.calling_settings.json` |
 | Annotation | `05_annotated/` | snpEff | `*.ann.vcf.gz`, only if the reference is in `SNPEFF_DB`; otherwise this folder stays empty |
 | Flag & report | `06_reports/` | bcftools filter + polars | `*.flagged.vcf.gz` (FILTER set), `*.all_calls.tsv` (every call + reason), `*.high_confidence_variants.tsv` (PASS only: QUAL ≥ 30 **and** DP ≥ 15 **and** AF ≥ 0.8) |
 | Statistics (step 9b) | `06_reports/` | R (`R/variant_stats.R`) | `*.r_stats.tsv` (one row per test), `*.r_windows.tsv` (variants per 1 kb window + hotspot test), `*.r_stats.log` |
 | Tool logs | `logs/` | — | `bwa_index.log`, `samtools_*.log` |
-| **Dashboard** | `07_dashboard/` | dashboard.py | `dashboard.html` (open in a browser), `sample_summary.csv`, `all_samples_variants.csv`, `all_samples_calls.csv`, `r_statistics.csv`, `variant_windows.csv` |
+| **Dashboard** | `07_dashboard/` | dashboard.py | `dashboard.html` (open in a browser), `sample_summary.csv`, `all_samples_variants.csv`, `all_samples_calls.csv`, `r_statistics.csv`, `variant_windows.csv`, `reference_screen.csv`, `taxonomy.csv` |
 
 When it finishes you'll see `PIPELINE COMPLETED SUCCESSFULLY` with the paths to the BAM, VCF, report and dashboard. The log also prints how many variants passed the filter, and how many were flagged for each reason, e.g. `Filter QUAL >= 30.0 & DP >= 15 & AF >= 0.8: kept 151 / 559 calls  (flagged: LowQual 5, LowDepth 408, LowAF 0)`.
+
+## 6b. Sample checks: screen, host removal, Kraken2, controls
+
+Before alignment, every sample goes through up to three checks. They answer: *is this really the organism I'm calling variants against, and is anything else in the sample?* Their findings are **warnings** in the log and appear in the dashboard's **Sample identity & contamination** card. They never stop the run.
+
+| Check | On by default? | Turn on/off | Needs |
+|---|---|---|---|
+| **Reference screen** (5c) | yes | `screen: false` · interactive: `NGS_SCREEN=0` | internet once (~17 MB into `~/.cache/ngs_pipeline/reference_screen/`) |
+| **Host removal** (5b) | no | `host_index: /path/host.fa` · `NGS_HOST_INDEX=…` | a bwa-indexed host genome ([Prerequisites §1d](Prerequisites.md)) |
+| **Kraken2 + Bracken** (5d) | no | `kraken_db: /path/db` · `NGS_KRAKEN_DB=…` | the `ngs-kraken` env + a database ([Prerequisites §1c](Prerequisites.md)) |
+| **Negative controls** | – | `control: true` on a sample in `config.yaml` | Snakemake/Nextflow (several samples) |
+
+```bash
+# Interactive script with every check on
+export NGS_HOST_INDEX=~/host/chm13v2.0.fa
+export NGS_KRAKEN_DB=~/kraken_db/viral
+python3 run_interactive_pipeline.py
+```
+
+**Reference screen.** The first 50,000 reads are mapped against every built-in genome at once, plus human rRNA and mitochondrial DNA as decoys. Results are reported per organism, so influenza's 8 segments count together:
+
+| Column | Meaning |
+|---|---|
+| Reads | Reads placed on this organism only (at least 80% of the read aligned, at most 5% mismatches) |
+| Shared | Reads that fit several organisms equally well, split in proportion to each one's own reads |
+| Distant | Reads at 85–95% identity: a divergent strain, or a relative that is not in the list |
+| Spread | How many of 100 equal stretches along the genome got a uniquely placed read |
+| Evenness | Spread ÷ the spread expected if those reads landed at random. **≈ 1: the organism is there. Much less than 1: reads pile up in a few genes** |
+| Status | `detected` (spread ≥ 5 and evenness ≥ 0.5), `divergent?`, `piled up`, `host`, or `–` |
+
+On SRR1553607 (Ebola) the screen shows why evenness matters:
+- Ebola: 39 reads over 32/100 of the virus, evenness 0.99 → **detected**.
+- M. tuberculosis: 68 reads, all in 2/100 (its rRNA genes), evenness 0.04 → **piled up**. These are conserved rRNA reads, likely from a contaminant.
+- S. aureus: 59 reads land on its several rRNA copies, but only 1 is placed uniquely → **piled up**.
+
+It warns when the reference you chose is not detected, when another genome matches better, when more than one organism is detected (mixed infection or contamination), when a divergent relative is present, and when more than 20% of reads are human.
+
+**Host removal.** Read pairs where either read maps to the host genome are removed. Every later step (screen, Kraken2, alignment) uses the remaining reads. `*.host_removal.json` records how many were removed.
+
+**Kraken2 + Bracken.** Kraken2 classifies every read against the database; Bracken re-estimates reads per species. If Bracken can't run (no k-mer file for your read length), Kraken2's own species counts are used. Unlike the screen, this is an open-world check: it can find organisms that aren't in the built-in list. Its answer is only as good as the database. The Viral database, for example, can't see bacteria or human reads.
+
+**Negative controls.** Sequence an extraction blank or no-template control in the same run and mark it `control: true` in the config:
+- Controls go through QC and the checks only, never variant calling.
+- For every finding in a sample (screen organism or Kraken2 species), the dashboard compares its reads per million with the controls.
+- A finding with less than **10×** the control's level is marked *in control*. It is likely reagent or lab contamination, not from the sample.
 
 ### Report columns
 
@@ -205,8 +329,10 @@ Or right-click the file in the Explorer → **Download**, and double-click it on
 | **How the variants were called** | ✓ / ! for each calling setting (MAPQ ≥ 20, base Q ≥ 20, max depth, haploid, normalized, filters), read from `calling_settings.json`, so it shows what actually ran |
 | **Types of change** / **Effect on genes** | Base changes (A>G …) with the Ts/Tv ratio, or SnpEff effects when annotation ran |
 | **Statistics from R** | The R tests (step 9b) as a table with a plain-language reading of each, and a bar chart of trusted variants per window: hotspots (BH q < 0.05) in blue, the dashed line is the count expected if variants were spread evenly |
+| **Sample identity & contamination** | The sample checks (§6b): does the reference screen find the reference's organism, is more than one organism present, how much host was removed, Kraken2's top species, and whether anything is also in the negative control. Hidden when no check ran |
+| **Negative controls** | Each control's reads and what the screen and Kraken2 found in it (only when the config has `control: true` samples) |
 | **Variant table** | Search and sort the selected sample's trusted variants |
-| **Data tables** | The five CSV files shown in the page, with tabs for *Sample summary*, *Trusted variants (PASS)*, *All calls + filter reason*, *R statistics* and *Hotspot windows (R)*. You can search and sort them, and **Download this CSV** if you want the file. |
+| **Data tables** | The seven CSV files shown in the page, with tabs for *Sample summary*, *Trusted variants (PASS)*, *All calls + filter reason*, *R statistics*, *Hotspot windows (R)*, *Reference screen* and *Kraken2 species*. You can search and sort them, and **Download this CSV** if you want the file. |
 
 To rebuild the dashboard for an existing run folder, for example after changing the thresholds:
 
@@ -216,7 +342,7 @@ python3 dashboard.py ./NGS_run --min-qual 30 --min-dp 15
 
 ### 7.2 Power BI / Excel
 
-The same folder holds five CSV files in "long" format (one row per item), which Power BI and Excel pivot tables can use directly:
+The same folder holds seven CSV files in "long" format (one row per item), which Power BI and Excel pivot tables can use directly:
 
 | File | One row per | Columns |
 |------|-------------|---------|
@@ -225,6 +351,10 @@ The same folder holds five CSV files in "long" format (one row per item), which 
 | `all_samples_calls.csv` | call (all) | Sample, CHROM, POS, REF, ALT, QUAL, DP, AF, FILTER |
 | `r_statistics.csv` | statistic per sample | Sample, Metric, Value, Interpretation |
 | `variant_windows.csv` | genome window per sample | Sample, Window_start, Window_end, Variants, Expected, P_value, Q_value, Hotspot |
+| `reference_screen.csv` | built-in genome per sample and control | Sample, Is_control, Organism, Reference, Kind, Reads, Shared_reads, Distant_reads, Spread, Evenness, Distant_spread, Distant_evenness, Mean_identity, Reads_per_million, Control_RPM, Fold_over_control, Status |
+| `taxonomy.csv` | species per sample and control (top 15, Kraken2/Bracken) | Sample, Is_control, Species, Taxid, Reads, Fraction_of_classified, Reads_per_million, Control_RPM, Fold_over_control, In_control |
+
+`sample_summary.csv` also has five sample-check columns: `Host_reads_pct`, `Screen_best_match`, `Screen_matches_reference`, `Organisms_detected` and `Kraken_top_species`.
 
 **Power BI Desktop:** Home → **Get data** → **Text/CSV** → choose each file → **Load**. Then in **Model** view, link the two tables on `Sample`. Slicers on `Sample`, `Gene` or `Impact` now filter both tables.
 
@@ -270,12 +400,22 @@ Open `02_qc/*.fastp.html` in the browser for the QC report. In Codespaces, right
 |---------|-------|-----|
 | `command not found` (snpEff, bwa, …) | Environment not active | `source ~/miniforge3/bin/activate ngs-env` |
 | `ModuleNotFoundError: No module named 'polars'` | Running the system Python instead of the env's Python | Activate `ngs-env`, then check `which python3` |
-| `No pre-mapped reference genome found for organism` | Organism not in `REF_MAP` | Re-run and give a reference accession at question 4 |
-| `Local FASTQ not found` | Wrong path at question 1 | Use an absolute path (`realpath my_R1.fastq.gz`) |
+| `No pre-mapped reference genome found for organism` | ENA couldn't be reached at question 1, so the organism wasn't checked, and question 4 was left empty | Re-run and give a reference accession at question 4 (or `list` / `0`) |
+| `No built-in reference is covered well` after `0` | None of the built-in genomes has reads spread along it; the organism is probably not in the list | Find its RefSeq accession on https://www.ncbi.nlm.nih.gov/nuccore and type it |
+| `The configured reference … is NOT detected in the reads` (warning) | The reads don't come from the reference genome: wrong sample, wrong reference, or mostly host | Look at the dashboard's *Sample identity* card; try option `0` at question 4, or Kraken2 |
+| `More than one organism detected` (warning) | Two genomes are both covered evenly: mixed infection, or contamination | Compare with a negative control; check the AF histogram for a mixed sample |
+| `… reads at 85–95 % identity …` (warning) | A divergent strain or a relative not in the list | Variant calls against this reference are unreliable; find a closer reference or assemble de novo |
+| `Host removal failed` / `No bwa index at …` | `NGS_HOST_INDEX`/`host_index` doesn't point to a bwa-indexed FASTA | `bwa index <file>` (Prerequisites §1d) |
+| `Kraken2 classification failed` / `kraken2 not found` | No `ngs-kraken` env, or the database folder has no `hash.k2d` | Prerequisites §1c; a database bigger than RAM needs `kraken_memory_mapping: true` / `NGS_KRAKEN_MMAP=1` |
+| `! The screen failed: …` / `Couldn't download the reads or references` after `0` | No internet, or NCBI/ENA busy (the first screen downloads ~17 MB) | Try again, or type an accession. Delete `~/.cache/ngs_pipeline/reference_screen/` if a download was interrupted |
+| `! File not found: …` at question 1 | Wrong path | Use an absolute path (`realpath my_R1.fastq.gz`) |
+| `! ENA has no public run called …` | Typo in the accession, or the run isn't public yet | Check it on https://www.ebi.ac.uk/ena/browser/ |
+| `! … isn't valid FASTQ` / `can't read it as gzip` | The file is damaged, cut short, or not really `.gz` | Re-download or re-copy the file; `zcat file.fastq.gz \| head -8` should show 2 reads |
+| `! Input ended before every question was answered` | Piped answers (`printf …`) ran out, usually because one answer was rejected and asked again | Run it interactively once to see which answer was rejected |
 | `No SnpEff database mapped for reference ...` | No database listed for this reference in `SNPEFF_DB` (only E. coli `NC_000913.3` by default) | The run continues and the Effect/Impact/Gene columns stay empty. Add `"<accession>": "<database>"` to `SNPEFF_DB` |
 | `SnpEff annotation failed ...` | Database is in `SNPEFF_DB` but not downloaded | `snpEff download -v <database>` |
 | Run is single-end although you have R2 | R2's name doesn't match R1 apart from the read tag | Rename to `*_R1`/`*_R2` (or `_1`/`_2`, `_R1_001`/`_R2_001`) before the extension |
-| Fails at fastp after entering an `NC_`/`NM_` accession at question 1 | Question 1 expects reads. An NCBI nucleotide accession downloads a genome sequence, not reads | Enter an SRR/ERR/DRR run or a FASTQ path at question 1. Put reference accessions at question 4 |
+| `! 'NC_…' isn't a read accession` at question 1 | Question 1 expects reads; an NCBI nucleotide accession is a genome | Enter an SRR/ERR/DRR run or a FASTQ path at question 1. Put reference accessions at question 4 |
 | `Dashboard not created (...)` | The dashboard step failed. The report in `06_reports/` is still complete | Fix the cause shown, then rebuild: `python3 dashboard.py <run folder>` |
 | Dashboard shows a sample from an earlier run | The interactive script includes every report in its output folder | Use a new output folder per run, or delete the old report from `06_reports/` |
 | Disk full | Large FASTQ files | `df -h`; delete old runs or `00_raw/` once the run has finished |
@@ -297,12 +437,19 @@ min_dp: 15               #   AND good-quality depth >= 15
 min_af: 0.8              #   AND allele frequency >= 0.8 (failing calls are flagged, not deleted)
 hotspot_window: 1000     # window size (bp) for the R hotspot test
 
+screen: true             # reference screen (see 6b)
+host_index: ""           # bwa-indexed host genome → host removal on
+kraken_db: ""            # Kraken2 database folder → classification on
 samples:
   SRR1553607:            # sample name = output file prefix
     sra: SRR1553607      # downloaded from ENA
   my_sample:
     r1: /path/to/my_sample_R1.fastq.gz   # local files are read in place
     r2: /path/to/my_sample_R2.fastq.gz
+  blank:                 # a negative control: QC + checks only
+    r1: /path/to/blank_R1.fastq.gz
+    r2: /path/to/blank_R2.fastq.gz
+    control: true
 ```
 
 ### 9.2 Run it
@@ -386,7 +533,7 @@ bash workflow/run_nextflow.sh --min_dp 20 --threads 2           # override a set
 bash workflow/run_nextflow.sh -resume                           # reuse steps that already finished
 ```
 
-Processes, in order: `DOWNLOAD_READS` (SRA samples only) → `DOWNLOAD_REFERENCE` → `INDEX_REFERENCE` → `FASTP` → `ALIGN` → `CALL_VARIANTS` → `ANNOTATE` (only if the reference is in `SNPEFF_DB`) → `REPORT` → `R_STATS` → `DASHBOARD`.
+Processes, in order: `DOWNLOAD_READS` (SRA samples only) → `DOWNLOAD_REFERENCE` → `INDEX_REFERENCE` → `FASTP` → `HOST_REMOVAL` (if `host_index`) → `SCREEN` (unless `screen: false`) and `CLASSIFY` (if `kraken_db`) → `ALIGN` (not for controls) → `CALL_VARIANTS` → `ANNOTATE` (only if the reference is in `SNPEFF_DB`) → `REPORT` → `R_STATS` → `DASHBOARD`.
 
 `run_nextflow.sh` passes its arguments to `nextflow run workflow/main.nf` and keeps everything Nextflow writes inside the output folder, so the folder you run from stays clean. Results go to `results_nf/` (so they never mix with Snakemake's `results/`), in the same numbered folders, plus:
 - `results_nf/pipeline_info/`: `nextflow.log` (Nextflow's own log; the previous run's is `nextflow.log.1`), and `report.html`, `timeline.html` and `trace.tsv`, a record of every step with run time, CPU and memory.
@@ -401,9 +548,9 @@ A plain `nextflow run workflow/main.nf` still works and still puts `work/` in `r
 
 | Setting | Where | Default |
 |---|---|---|
-| Samples, `reference`, `min_qual`, `min_dp`, `min_af`, `hotspot_window` | `config/config.yaml` (or `--config my.yaml`) | as in the file |
-| Same settings, for one run | command line: `--reference NC_000913.3`, `--min_dp 20` … | from the YAML |
-| `outdir`, `threads` | `workflow/nextflow.config` or `--outdir`, `--threads` | `results_nf`, 4 (only `FASTP` and `ALIGN` use threads, capped at the machine's cores; other steps use 1 CPU) |
+| Samples, `reference`, `min_qual`, `min_dp`, `min_af`, `hotspot_window`, `screen`, `host_index`, `kraken_db`, `kraken_memory_mapping` | `config/config.yaml` (or `--config my.yaml`) | as in the file |
+| Same settings, for one run | command line: `--reference NC_000913.3`, `--min_dp 20`, `--kraken_db /path`, `--screen false` … | from the YAML |
+| `outdir`, `threads` | `workflow/nextflow.config` or `--outdir`, `--threads` | `results_nf`, 4 (only `FASTP`, `ALIGN`, `HOST_REMOVAL`, `SCREEN` and `CLASSIFY` use threads, capped at the machine's cores; other steps use 1 CPU) |
 | Where jobs run | `executor` in `workflow/nextflow.config` | `local` |
 
 Unlike Snakemake, Nextflow notices when a setting changes: with `-resume`, a new `--min_dp` re-runs `REPORT`, `R_STATS` and `DASHBOARD` and reuses everything before them.
@@ -416,4 +563,5 @@ Unlike Snakemake, Nextflow notices when a setting changes: with `-resume`, a new
 | `Process R_STATS … Rscript not found` | The `ngs-r` env doesn't exist | `mamba create -n ngs-r -c conda-forge -y r-base`, then `-resume` |
 | `… is not paired-end; this workflow needs paired reads` | The SRA run is single-end | Use the interactive script for single-end data |
 | Any failed process | See the error and the work folder it names (`results_nf/nextflow/work/xx/…`) | `cat <that folder>/.command.log` shows the step's full output, and `results_nf/pipeline_info/nextflow.log` has Nextflow's side; fix the cause and add `-resume` |
+| `Process CLASSIFY … kraken2 not found` | The `ngs-kraken` env doesn't exist | `mamba create -n ngs-kraken -c conda-forge -c bioconda -y kraken2 bracken` (Prerequisites §1c), then `-resume` |
 | `Task requirement exceeds available CPUs` | A process asked for more CPUs than the machine has | Fixed in `nextflow.config` (only `FASTP`/`ALIGN` use threads, capped at the machine's cores); if you edited `cpus`, lower it or pass `--threads 2` |

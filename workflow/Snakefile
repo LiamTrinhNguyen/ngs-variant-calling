@@ -21,6 +21,14 @@
 # Step 9b (rule r_stats) runs R/variant_stats.R with Rscript from the `ngs-r`
 # env (found by ngs.find_rscript()). The same steps are also available as a
 # Nextflow pipeline: workflow/main.nf.
+#
+# Sample checks (steps 5b–5d), between QC and alignment:
+#   host_removal  only if `host_index:` is set (bwa index of the host genome)
+#   screen        unless `screen: false` – which built-in genome the reads match
+#   classify      only if `kraken_db:` is set (Kraken2 + Bracken, env ngs-kraken)
+# Samples with `control: true` (negative controls, e.g. extraction blanks) go
+# through QC and these checks only, never variant calling; the dashboard
+# compares every sample's findings with them.
 # =============================================================================
 
 import re
@@ -51,8 +59,16 @@ config.update(_merged)
 OUT      = config["outdir"]
 REF      = config["reference"]
 REF_FA   = f"{OUT}/01_reference/{REF}.fasta"
-SAMPLES  = list(config["samples"])
 THREADS  = int(config.get("threads", 4))
+# Negative controls (control: true) are checked but never variant-called
+ALL_SAMPLES = list(config["samples"])
+CONTROLS = [s for s in ALL_SAMPLES if (config["samples"][s] or {}).get("control")]
+SAMPLES  = [s for s in ALL_SAMPLES if s not in CONTROLS]
+# Optional sample checks (empty = off)
+HOST     = str(config.get("host_index") or "")
+KRAKEN   = str(config.get("kraken_db") or "")
+SCREEN   = bool(config.get("screen", True))
+KRAKEN_MMAP = bool(config.get("kraken_memory_mapping", False))
 
 # Decide once, up front, whether annotation can run for this reference.
 # WHY: SnpEff only works when its database matches the reference (see
@@ -62,12 +78,15 @@ SNPEFF_GENOME = ngs.SNPEFF_DB.get(REF)
 # Sample names must be exactly the names in config.yaml.
 # WHY: stops Snakemake guessing a sample name from a similar-looking file name.
 wildcard_constraints:
-    sample = "|".join(re.escape(s) for s in SAMPLES)
+    sample = "|".join(re.escape(s) for s in ALL_SAMPLES)
 
 
 # Warn at the start if annotation will be skipped
 # WHY: you know before the run, not after, that Effect/Impact/Gene will be empty
 onstart:
+    ngs.log.info(f"Samples: {len(SAMPLES)} · negative controls: {len(CONTROLS)} · "
+                 f"host removal: {'on' if HOST else 'off'} · reference screen: {'on' if SCREEN else 'off'} · "
+                 f"Kraken2: {'on' if KRAKEN else 'off'}")
     if SNPEFF_GENOME is None:
         ngs.log.warning(
             f"Reference {REF} has no entry in SNPEFF_DB – annotation will be skipped "
@@ -85,10 +104,21 @@ CALLS   = expand(f"{OUT}/06_reports/{{sample}}.all_calls.tsv", sample=SAMPLES)
 
 R_STATS = expand(f"{OUT}/06_reports/{{sample}}.r_stats.tsv", sample=SAMPLES)
 
+# Sample-check outputs, for samples AND controls (only the steps that are on)
+CHECKS = []
+if HOST:
+    CHECKS += expand(f"{OUT}/02_qc/{{sample}}.host_removal.json", sample=ALL_SAMPLES)
+if SCREEN:
+    CHECKS += expand(f"{OUT}/02_qc/{{sample}}.reference_screen.tsv", sample=ALL_SAMPLES)
+if KRAKEN:
+    CHECKS += expand(f"{OUT}/02_qc/{{sample}}.{{f}}", sample=ALL_SAMPLES,
+                     f=["kraken2.report", "bracken_species.tsv"])
+
 rule all:
     input:
         REPORTS,
         R_STATS,   # WHY listed here too: an existing dashboard.html alone doesn't make Snakemake look for them
+        CHECKS,
         f"{OUT}/07_dashboard/dashboard.html",
 
 
@@ -185,6 +215,74 @@ rule fastp:
                       wildcards.sample, threads)
 
 
+def clean_reads(wildcards):
+    """The reads every later step uses: host-removed if host removal is on,
+    otherwise fastp's trimmed reads."""
+    if HOST:
+        return {"r1": f"{OUT}/02_qc/{wildcards.sample}_R1.host_removed.fastq.gz",
+                "r2": f"{OUT}/02_qc/{wildcards.sample}_R2.host_removed.fastq.gz"}
+    return {"r1": f"{OUT}/02_qc/{wildcards.sample}_R1.trimmed.fastq.gz",
+            "r2": f"{OUT}/02_qc/{wildcards.sample}_R2.trimmed.fastq.gz"}
+
+
+# -----------------------------------------------------------------------------
+# rule host_removal – STEP 5b · host removal (only if host_index is set)
+#   WHAT: keeps only read pairs that don't map to the host genome
+#   WHY:  clinical samples are mostly host; removing it speeds up later steps,
+#         avoids false variants from host reads, and keeps human data out
+# -----------------------------------------------------------------------------
+rule host_removal:
+    input:
+        r1 = rules.fastp.output.r1,
+        r2 = rules.fastp.output.r2,
+    output:
+        r1   = f"{OUT}/02_qc/{{sample}}_R1.host_removed.fastq.gz",
+        r2   = f"{OUT}/02_qc/{{sample}}_R2.host_removed.fastq.gz",
+        json = f"{OUT}/02_qc/{{sample}}.host_removal.json",
+    threads: THREADS
+    run:
+        ngs.remove_host(Path(input.r1), Path(input.r2), HOST, Path(output.json).parent,
+                        wildcards.sample, threads)
+
+
+# -----------------------------------------------------------------------------
+# rule screen – STEP 5c · reference screen
+#   WHAT: maps 50,000 reads against every built-in genome (+ human decoys) and
+#         ranks them by how evenly the reads cover each genome
+#   WHY:  confirms the sample matches the configured reference, and shows
+#         mixed samples, contamination and divergent strains. Never stops the
+#         run: findings are warnings and appear in the dashboard.
+# -----------------------------------------------------------------------------
+rule screen:
+    input:
+        unpack(clean_reads),
+    output:
+        f"{OUT}/02_qc/{{sample}}.reference_screen.tsv",
+    threads: THREADS
+    run:
+        ngs.screen_sample(Path(input.r1), Path(output[0]).parent, wildcards.sample, threads,
+                          expected_ref=None if wildcards.sample in CONTROLS else REF)
+
+
+# -----------------------------------------------------------------------------
+# rule classify – STEP 5d · Kraken2 + Bracken (only if kraken_db is set)
+#   WHAT: assigns reads to taxa with a large database; Bracken estimates reads
+#         per species
+#   WHY:  an open-world answer to "what is in this sample?", which the screen's
+#         fixed list can't give
+# -----------------------------------------------------------------------------
+rule classify:
+    input:
+        unpack(clean_reads),
+    output:
+        report  = f"{OUT}/02_qc/{{sample}}.kraken2.report",
+        species = f"{OUT}/02_qc/{{sample}}.bracken_species.tsv",
+    threads: THREADS
+    run:
+        ngs.classify_reads(Path(input.r1), Path(input.r2), KRAKEN, Path(output.report).parent,
+                           wildcards.sample, threads, memory_mapping=KRAKEN_MMAP)
+
+
 # -----------------------------------------------------------------------------
 # rule align – STEP 6 · alignment
 #   WHAT: BWA-MEM places reads on the reference; samtools sorts and indexes
@@ -193,10 +291,9 @@ rule fastp:
 # -----------------------------------------------------------------------------
 rule align:
     input:
+        unpack(clean_reads),                  # trimmed (and host-removed) reads
         ref = REF_FA,
         idx = rules.index_reference.output,   # wait until the index exists
-        r1  = rules.fastp.output.r1,          # use the cleaned reads
-        r2  = rules.fastp.output.r2,
     output:
         bam = f"{OUT}/03_aligned/{{sample}}.sorted.bam",
         bai = f"{OUT}/03_aligned/{{sample}}.sorted.bam.bai",
@@ -321,8 +418,9 @@ rule dashboard:
         #     were used. Runs made before this file existed are re-called so the
         #     page never shows settings it can't prove.
         expand(f"{OUT}/04_variants/{{sample}}.calling_settings.json", sample=SAMPLES),
-        expand(f"{OUT}/02_qc/{{sample}}.fastp.json", sample=SAMPLES),
+        expand(f"{OUT}/02_qc/{{sample}}.fastp.json", sample=ALL_SAMPLES),
         expand(f"{OUT}/03_aligned/{{sample}}.sorted.bam", sample=SAMPLES),
+        CHECKS,   # screen / Kraken2 / host removal, shown in "Sample identity & contamination"
     output:
         html    = f"{OUT}/07_dashboard/dashboard.html",
         summary = f"{OUT}/07_dashboard/sample_summary.csv",
@@ -330,6 +428,8 @@ rule dashboard:
         calls   = f"{OUT}/07_dashboard/all_samples_calls.csv",
         rstats  = f"{OUT}/07_dashboard/r_statistics.csv",
         windows = f"{OUT}/07_dashboard/variant_windows.csv",
+        screen  = f"{OUT}/07_dashboard/reference_screen.csv",
+        taxa    = f"{OUT}/07_dashboard/taxonomy.csv",
     run:
         dashboard.build_dashboard(
             Path(OUT),
@@ -338,4 +438,5 @@ rule dashboard:
             min_af=float(config.get("min_af", ngs.MIN_AF)),
             # WHY: only the samples in the config, not old reports left in the folder
             samples=SAMPLES,
+            controls=CONTROLS,
         )

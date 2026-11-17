@@ -19,10 +19,16 @@
  *      running give the same results. If a function changes, update the
  *      matching process here AND the rule in workflow/Snakefile.
  *
+ * Sample checks (steps 5b–5d) run between FASTP and ALIGN: HOST_REMOVAL (if
+ * host_index is set), SCREEN (unless screen: false) and CLASSIFY (if kraken_db
+ * is set). Samples with `control: true` get QC and these checks only.
+ *
  * Usage (from ngs-variant-calling/, with ngs-env active):
- *   nextflow run workflow/main.nf                               # config/config.yaml
- *   nextflow run workflow/main.nf --config my.yaml --outdir /path/to/out
- *   nextflow run workflow/main.nf -resume                        # reuse finished steps
+ *   bash workflow/run_nextflow.sh                               # config/config.yaml
+ *   bash workflow/run_nextflow.sh --config my.yaml --outdir /path/to/out
+ *   bash workflow/run_nextflow.sh -resume                       # reuse finished steps
+ *   (run_nextflow.sh = nextflow run workflow/main.nf, with Nextflow's own
+ *    log, work and cache kept inside the output folder)
  * =============================================================================
  */
 
@@ -132,6 +138,65 @@ process FASTP {
     script:
     py("""
     ngs.run_fastp(Path("${r1}"), Path("${r2}"), Path("."), "${sample}", ${task.cpus})
+    """)
+}
+
+// STEP 5b · host removal – only when host_index is set
+process HOST_REMOVAL {
+    tag "${sample}"
+    publishDir "${params.outdir}/02_qc", mode: 'copy'
+
+    input:
+    tuple val(sample), path(r1), path(r2)
+    val opts
+
+    output:
+    tuple val(sample), path("${sample}_R1.host_removed.fastq.gz"), path("${sample}_R2.host_removed.fastq.gz"), emit: reads
+    path "${sample}.host_removal.json", emit: json
+    path "${sample}.host_removal.log"
+
+    script:
+    py("""
+    ngs.remove_host(Path("${r1}"), Path("${r2}"), "${opts.host_index}", Path("."), "${sample}", ${task.cpus})
+    """)
+}
+
+// STEP 5c · reference screen – which built-in genome the reads match
+process SCREEN {
+    tag "${sample}"
+    publishDir "${params.outdir}/02_qc", mode: 'copy'
+
+    input:
+    tuple val(sample), path(r1), path(r2), val(is_control)
+    val opts
+
+    output:
+    path "${sample}.reference_screen.tsv"
+
+    script:
+    def expected = is_control ? "None" : "\"${opts.reference}\""
+    py("""
+    ngs.screen_sample(Path("${r1}"), Path("."), "${sample}", ${task.cpus}, expected_ref=${expected})
+    """)
+}
+
+// STEP 5d · Kraken2 + Bracken – only when kraken_db is set
+process CLASSIFY {
+    tag "${sample}"
+    publishDir "${params.outdir}/02_qc", mode: 'copy'
+
+    input:
+    tuple val(sample), path(r1), path(r2)
+    val opts
+
+    output:
+    path "${sample}.{kraken2.report,bracken_species.tsv}", emit: tables
+    path "${sample}.*.log"
+
+    script:
+    py("""
+    ngs.classify_reads(Path("${r1}"), Path("${r2}"), "${opts.kraken_db}", Path("."), "${sample}",
+                       ${task.cpus}, memory_mapping=${opts.kraken_mmap ? 'True' : 'False'})
     """)
 }
 
@@ -249,7 +314,9 @@ process DASHBOARD {
     path bams,      stageAs: '03_aligned/*'
     path settings,  stageAs: '04_variants/*'
     path reports,   stageAs: '06_reports/*'
+    path checks,    stageAs: '02_qc/checks/*'   // screen / Kraken2 / host removal files
     val samples
+    val controls
     val opts
 
     output:
@@ -257,10 +324,14 @@ process DASHBOARD {
 
     script:
     def names = samples.collect { "\"${it}\"" }.join(', ')
+    def ctrls = controls.collect { "\"${it}\"" }.join(', ')
     py("""
     import dashboard
+    # The checks were staged in a sub-folder (their names can't clash with FASTP's); move them up
+    for f in Path("02_qc/checks").glob("*"):
+        shutil.copy(f.resolve(), Path("02_qc") / f.name)
     dashboard.build_dashboard(Path("."), min_qual=${opts.min_qual}, min_dp=${opts.min_dp},
-                              min_af=${opts.min_af}, samples=[${names}])
+                              min_af=${opts.min_af}, samples=[${names}], controls=[${ctrls}])
     """)
 }
 
@@ -280,10 +351,21 @@ workflow {
         min_dp:         params.min_dp         ?: (cfg.min_dp ?: 15),
         min_af:         params.min_af         ?: (cfg.min_af ?: 0.8),
         hotspot_window: params.hotspot_window ?: (cfg.hotspot_window ?: 1000),
+        // optional sample checks (empty = off)
+        host_index:     params.host_index ?: (cfg.host_index ?: ''),
+        kraken_db:      params.kraken_db  ?: (cfg.kraken_db  ?: ''),
+        kraken_mmap:    params.kraken_memory_mapping != null ? params.kraken_memory_mapping as boolean
+                                                             : (cfg.kraken_memory_mapping ?: false),
+        screen:         params.screen != null ? params.screen as boolean : (cfg.screen != false),
     ]
     def samples = cfg.samples as Map
-    log.info "NGS variant calling (Nextflow) · ${samples.size()} sample(s) · reference ${opts.reference} · " +
-             "filters QUAL>=${opts.min_qual} DP>=${opts.min_dp} AF>=${opts.min_af} · out ${params.outdir}"
+    // Negative controls (control: true): QC + checks only, never variant calling
+    def controls = samples.findAll { k, v -> v?.control }.keySet() as List
+    def callable = samples.keySet().findAll { !controls.contains(it) } as List
+    log.info "NGS variant calling (Nextflow) · ${callable.size()} sample(s) + ${controls.size()} control(s) · " +
+             "reference ${opts.reference} · filters QUAL>=${opts.min_qual} DP>=${opts.min_dp} AF>=${opts.min_af} · " +
+             "host removal ${opts.host_index ? 'on' : 'off'} · screen ${opts.screen ? 'on' : 'off'} · " +
+             "Kraken2 ${opts.kraken_db ? 'on' : 'off'} · out ${params.outdir}"
 
     // Ask the Python module whether SnpEff has a database for this reference.
     // WHY ask Python: SNPEFF_DB is defined once, in run_interactive_pipeline.py.
@@ -306,7 +388,26 @@ workflow {
 
     // ---- per-sample steps ----
     FASTP(reads_ch)
-    bam_ch = ALIGN(FASTP.out.reads, ref_files)
+
+    // ---- sample checks (5b–5d), for samples AND controls ----
+    checks_ch = channel.empty()
+    clean_ch = FASTP.out.reads
+    if (opts.host_index) {
+        HOST_REMOVAL(FASTP.out.reads, opts)
+        clean_ch = HOST_REMOVAL.out.reads
+        checks_ch = checks_ch.mix(HOST_REMOVAL.out.json)
+    }
+    if (opts.screen) {
+        SCREEN(clean_ch.map { s, r1, r2 -> tuple(s, r1, r2, controls.contains(s)) }, opts)
+        checks_ch = checks_ch.mix(SCREEN.out)
+    }
+    if (opts.kraken_db) {
+        CLASSIFY(clean_ch, opts)
+        checks_ch = checks_ch.mix(CLASSIFY.out.tables.flatten())
+    }
+
+    // ---- variant calling: samples only, not controls ----
+    bam_ch = ALIGN(clean_ch.filter { s, r1, r2 -> !controls.contains(s) }, ref_files)
     CALL_VARIANTS(bam_ch, ref_files)
     vcf_ch = snpeff_genome ? ANNOTATE(CALL_VARIANTS.out.vcf, snpeff_genome) : CALL_VARIANTS.out.vcf
     REPORT(vcf_ch, opts)
@@ -320,7 +421,9 @@ workflow {
         bam_ch.map { s, bam, bai -> [bam, bai] }.flatten().collect(),
         CALL_VARIANTS.out.settings.collect(),
         REPORT.out.report.mix(REPORT.out.calls.map { s, f -> f }, R_STATS.out.tables.flatten()).collect(),
-        samples.keySet() as List,
+        checks_ch.collect().ifEmpty([]),     // WHY ifEmpty: with every check off, DASHBOARD must still run
+        callable,
+        controls,
         opts,
     )
 }

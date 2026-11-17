@@ -15,6 +15,7 @@ outdir: results
 # Annotation only runs if this accession is in SNPEFF_DB (default: only NC_000913.3).
 #   e.g. NC_002549.1 (Zaire ebolavirus)   NC_000913.3 (E. coli K-12)
 #        NC_045512.2 (SARS-CoV-2)         NC_003198.1 (Salmonella enterica)
+#        Influenza_A_PR8 (all 8 influenza A segments in one FASTA; see REF_SETS)
 reference: NC_002549.1
 
 # CPU threads per step (fastp, bwa mem, samtools sort).
@@ -33,6 +34,34 @@ min_qual: 30
 min_dp: 15
 min_af: 0.8
 
+# ---------------------------------------------------------------------------
+# Sample checks (steps 5b–5d), run between QC and alignment for every sample
+# AND every negative control. Results: 02_qc/ and the dashboard's
+# "Sample identity & contamination" card.
+# ---------------------------------------------------------------------------
+# Reference screen: maps 50,000 reads against every built-in genome and warns
+# if the reads don't match `reference`, or match more than one organism.
+# WHY on by default: a wrong reference or a mixed sample makes every variant
+#     meaningless, and the check takes seconds (the first run downloads ~17 MB).
+screen: true
+
+# Host removal: a bwa-indexed host genome (e.g. human T2T-CHM13). Pairs whose
+# reads map to it are removed before alignment. Empty = off.
+# WHY: clinical samples are often > 90 % host; removing it is faster, avoids
+#     false variants, and keeps human sequence out of the results.
+#     Build once:  bwa index chm13v2.0.fa   (~1 h, ~5 GB RAM)
+host_index: ""
+
+# Kraken2 + Bracken classification: a Kraken2 database folder. Empty = off.
+# WHY: an open-world "what is in this sample?", which the screen's fixed list
+#     can't answer. Tools are in the ngs-kraken env (see Prerequisites.md).
+#     Prebuilt databases: https://benlangmead.github.io/aws-indexes/k2
+#     (Standard-8 needs ~8 GB RAM; Viral ~1 GB covers viruses only)
+kraken_db: ""
+# true = read the database from disk instead of loading it into RAM
+# (slower, but needed when the database is bigger than the machine's memory)
+kraken_memory_mapping: false
+
 # Window size (bp) for the hotspot test in the R statistics step (9b).
 # WHY 1000: about 19 windows on Ebola (19 kb); use 10000 or more for bacteria (~5 Mb).
 hotspot_window: 1000
@@ -41,6 +70,10 @@ hotspot_window: 1000
 # Each sample is paired-end and is EITHER
 #   sra: <run accession>       downloaded from ENA, or
 #   r1:/r2: <local FASTQ>      read where they are (not copied).
+# Add  control: true  to a NEGATIVE CONTROL (e.g. an extraction blank or
+# no-template control sequenced in the same run). Controls get QC and the
+# sample checks only, never variant calling; a finding in a sample then
+# counts only if it is ≥ 10× above the controls (reads per million).
 samples:
   SRR1553607:
     sra: SRR1553607
@@ -48,3 +81,8 @@ samples:
   # my_sample:
   #   r1: /path/to/my_sample_R1.fastq.gz
   #   r2: /path/to/my_sample_R2.fastq.gz
+
+  # blank:                       # negative control
+  #   r1: /path/to/blank_R1.fastq.gz
+  #   r2: /path/to/blank_R2.fastq.gz
+  #   control: true

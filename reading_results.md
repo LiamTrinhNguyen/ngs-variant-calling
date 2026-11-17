@@ -99,6 +99,28 @@ Each check shows **✓ OK** (green) or **! Check** (amber) with a one-line expla
 
 **How to judge "! Check" for mapping:** SRR1553607 is RNA from a patient sample, so most reads are human or other organisms. **For clinical metagenomic samples this is expected.** For a pure bacterial culture it would be a red flag: the wrong organism, contamination, or the wrong reference. The low mapping rate is also why depth is only about 16×: 98.8% of the sequencing went to other organisms.
 
+### 3.3b Sample identity & contamination: "Is this the organism I think it is?"
+
+This card shows the sample checks that run before alignment (see [workflow_run.md §6b](workflow_run.md#6b-sample-checks-screen-host-removal-kraken2-controls)). It only appears if at least one check ran. Its warnings also count towards the sample's status badge in the *All samples* table.
+
+| Check | OK when | SRR1553607 | Meaning |
+|-------|---------|-----------|---------|
+| Host reads removed | (information) | 0.1% with the small rRNA+mito test index | How much of the sample was host; the rest went on to alignment |
+| Reads match the reference | the best evenly-covered genome *is* the reference | ✓ Zaire ebolavirus | The variants were called against the right genome |
+| More than one organism | only shown when ≥ 2 genomes are covered evenly | – | Mixed infection or contamination |
+| Divergent relative | only shown when 85–95%-identity reads cover a genome evenly | – | A strain too far from the reference: variant calls would be unreliable |
+| Also in the negative control | only shown with controls | – | The finding is below 10× the control's level: likely contamination |
+| Most abundant species (Kraken2) | (information) | Orthoebolavirus zairense, 79% of classified reads | An independent, database-wide answer |
+
+**Reference screen table** (left). For each built-in genome it shows the reads that match closely, the **spread** (how many of 100 stretches of the genome got a read) and the **evenness** (spread ÷ what random placement of those reads would give). Read it like this:
+- **Evenness ≈ 1 and spread ≥ 5 → detected.** On SRR1553607, Ebola gets 44 reads over 35/100 of its genome, with evenness 0.98.
+- **Many reads but evenness close to 0 → piled up.** M. tuberculosis gets 84 reads, but all of them sit in 2 places (its rRNA genes), evenness 0.04. These are reads from genes that every bacterium shares, often from reagent contamination. They don't show that M. tuberculosis is present. Ranking by read count alone would have named the wrong organism.
+- **"In control" / × control:** with a negative control in the run, each organism's reads per million are compared with the control's. Below 10×, the finding is treated as contamination.
+
+**Kraken2 species table** (right, only with a Kraken2 database). It shows Bracken's read estimate per species and its share of the classified reads. Two things to keep in mind:
+- **A high "unclassified" share is normal** when the database doesn't cover the host. With the Viral database, every human read is unclassified (98.6% here).
+- **A species name can differ from the reference's organism name** because of naming changes: *Orthoebolavirus zairense* is the current name for Zaire ebolavirus.
+
 ### 3.4 From raw calls to trusted variants (funnel)
 
 Each bar applies one more rule:
@@ -232,7 +254,7 @@ The value of these tests lies in the combination. Two numbers that look the same
 
 ### 3.13 Data tables (the CSV files, in the page)
 
-Five tabs, the same rows as the CSV files saved next to the page:
+Seven tabs, the same rows as the CSV files saved next to the page:
 
 | Tab | File | One row per | Use it for |
 |-----|------|-------------|------------|
@@ -241,6 +263,8 @@ Five tabs, the same rows as the CSV files saved next to the page:
 | All calls + filter reason | `all_samples_calls.csv` | every call | The audit trail. Search `LowDepth` or `LowAF` to see what was excluded |
 | R statistics | `r_statistics.csv` | test per sample | Comparing Ts/Tv, mixed-sample signal and hotspots across samples |
 | Hotspot windows (R) | `variant_windows.csv` | window per sample | Search `True` to list the hotspot windows |
+| Reference screen | `reference_screen.csv` | built-in genome per sample (and control) | Search `detected` to see what each sample contains; `Fold_over_control` compares with the negative controls |
+| Kraken2 species | `taxonomy.csv` | species per sample (and control), top 15 | Contamination and unexpected organisms; empty when Kraken2 is off |
 
 Shown at most 1,000 rows at a time; use the search box to narrow down. **Download this CSV** saves the full table.
 
@@ -251,7 +275,11 @@ Shown at most 1,000 rows at a time; use the search box to narrow down. **Downloa
 | What you see | Likely cause | Next step |
 |--------------|--------------|-----------|
 | All checks ✓, AF histogram one bar near 100% | Good, clean sample | Report the PASS variants |
-| **Low mapping %** | Host or other organisms in the sample, or the wrong reference | Clinical sample: expected; consider host-read removal. Culture: check identity (e.g. Kraken2) and the reference. |
+| **Low mapping %** | Host or other organisms in the sample, or the wrong reference | Look at *Sample identity*: if "Reads match the reference" is ✓, it's host/background (clinical: expected; set `host_index`). If not, the reference or the sample is wrong |
+| **"Reads match the reference" is ! ** | The reads come from another genome, or none in the list | Use the organism the screen detects (option `0` at question 4), or Kraken2 for one outside the list |
+| **"More than one organism"** | Mixed infection or contamination | Check the negative control and the AF histogram (a bump at 30–70% supports a mixture) |
+| **"Divergent relative"** | Strain too far from the reference | Find a closer reference, or assemble the genome de novo |
+| **Finding marked "in control"** | Also present in the blank at a similar level | Treat it as contamination, not a result |
 | **Most calls flagged LowDepth** | Not enough reads on the target | Sequence deeper, or remove host reads |
 | **Mixed calls > 5 / AF bump at 30–70%** | Mixed infection or contamination | Check controls; consider re-isolating or re-extracting |
 | **Very many raw calls** (hundreds or more) | Reference is distant from your strain | Use a closer reference (for 2014 Ebola, a Makona genome) |
@@ -272,6 +300,9 @@ Shown at most 1,000 rows at a time; use the search box to narrow down. **Downloa
 | Term | Meaning |
 |------|---------|
 | **Read** | One short DNA/RNA sequence from the sequencer (here ~100 bases) |
+| **Spread / evenness** | In the reference screen: how many of 100 stretches of a genome got a read, and how that compares with random placement (≈ 1 = reads all along the genome) |
+| **Negative control** | A sample with no real material (extraction blank, no-template control) sequenced alongside the samples, to show what contamination looks like |
+| **Host removal** | Deleting reads that come from the patient or animal (the host) before analysing the pathogen |
 | **Reference genome** | The known genome everything is compared with |
 | **Variant / call** | A position where the sample differs from the reference |
 | **SNP** | Single-nucleotide change (one base swapped) |

@@ -86,6 +86,28 @@ mamba create -n ngs-r -c conda-forge -y r-base
 # To use another R, set:  export NGS_RSCRIPT=/path/to/Rscript
 # Without R the interactive script still finishes (only warns); Snakemake and Nextflow stop.
 
+## 1c. Kraken2 + Bracken, in their own environment (optional · step 5d)
+# WHY a separate env: same reason as R – keeps ngs-env's solver from changing
+#     bcftools/samtools. The pipeline finds ~/miniforge3/envs/ngs-kraken/bin/kraken2
+#     itself; you don't activate this env.
+mamba create -n ngs-kraken -c conda-forge -c bioconda -y kraken2 bracken
+# A database (pick one; prebuilt at https://benlangmead.github.io/aws-indexes/k2):
+#   Viral       ~0.6 GB download, ~1 GB RAM  – viruses only (good for testing)
+#   Standard-8  ~8 GB download,   ~8 GB RAM  – bacteria, archaea, viruses, human, …
+#   (bigger than your RAM? set kraken_memory_mapping: true – slower, but it runs)
+mkdir -p ~/kraken_db/viral && cd ~/kraken_db/viral
+curl -L https://genome-idx.s3.amazonaws.com/kraken/k2_viral_20241228.tar.gz | tar -xz
+# Then: kraken_db: ~/kraken_db/viral (config.yaml) or export NGS_KRAKEN_DB=~/kraken_db/viral
+
+## 1d. Host genome for host removal (optional · step 5b)
+# A bwa index of the host. For human, the complete T2T-CHM13 assembly:
+mkdir -p ~/host && cd ~/host
+curl -LO https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/CHM13/assemblies/analysis_set/chm13v2.0.fa.gz
+gunzip chm13v2.0.fa.gz
+bwa index chm13v2.0.fa     # ~1 hour, ~5 GB RAM, ~5 GB disk – do it once (or on a bigger machine)
+# Then: host_index: ~/host/chm13v2.0.fa (config.yaml) or export NGS_HOST_INDEX=~/host/chm13v2.0.fa
+# A default 2-core / 8 GB Codespace is too small to build this comfortably.
+
 ## 1a.  Activate the environment (run this in every new terminal before running the pipeline)
 conda activate ngs-env
 
@@ -134,11 +156,6 @@ Download the E. coli database once before running. If it is missing, annotation 
 # Download the prebuilt E. coli K-12 MG1655 annotation database (genes, transcripts, codons)
 # -v = verbose output
 snpEff download -v Escherichia_coli_K_12_substr_MG1655
-
-# Download the prebuilt Ebola Zaire virus annotation database (genes, transcripts, codons)
-# Database: ebola_zaire (based on KJ660346.1 / Makona strain)
-# -v = verbose output
-snpEff download -v ebola_zaire
 ```
 
 For other organisms, list available databases and add an `"<reference accession>": "<database>"` entry to `SNPEFF_DB` in the script:
@@ -186,8 +203,9 @@ python3 -c "import sys; sys.path.insert(0,'ngs-variant-calling'); import run_int
 - Optional: Power BI Desktop or Excel. The dashboard already shows its CSV tables in the browser; these are only needed for your own analysis.
 
 - Linux (Ubuntu or GitHub Codespaces recommended)
-- Internet access (ENA / NCBI downloads)
+- Internet access (ENA / NCBI downloads; the reference screen downloads ~17 MB once into `~/.cache/ngs_pipeline/`)
 - ~2–4 GB free disk space per run
+- Optional sample checks: Kraken2 Standard-8 needs ~8 GB RAM (or `kraken_memory_mapping: true`); a human host index needs ~5 GB disk and ~5 GB RAM to build
 
 ## 6. How this file was created
 
