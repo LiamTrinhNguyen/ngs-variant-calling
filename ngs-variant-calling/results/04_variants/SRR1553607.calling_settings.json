@@ -1,0 +1,9 @@
+{
+  "min_mapq": 20,
+  "min_baseq": 20,
+  "max_depth": 10000,
+  "haploid": true,
+  "normalized": true,
+  "allele_depths": true,
+  "command": "bcftools mpileup -f results/01_reference/NC_002549.1.fasta -q 20 -Q 20 -d 10000 -a FORMAT/AD,FORMAT/DP -Ou results/03_aligned/SRR1553607.sorted.bam | bcftools call --ploidy 1 -mv -Ou | bcftools norm -f results/01_reference/NC_002549.1.fasta -m -any -Oz -o results/04_variants/SRR1553607.raw.vcf.gz"
+}
