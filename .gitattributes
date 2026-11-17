@@ -1,0 +1,5 @@
+*.fq.gz filter=lfs diff=lfs merge=lfs -text
+*.bam filter=lfs diff=lfs merge=lfs -text
+*.vcf.gz filter=lfs diff=lfs merge=lfs -text
+*.fastq.gz filter=lfs diff=lfs merge=lfs -text
+NGS_run/** filter=lfs diff=lfs merge=lfs -text
