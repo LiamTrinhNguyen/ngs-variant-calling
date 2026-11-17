@@ -24,6 +24,8 @@ These are installed separately into conda environments (see `Prerequisites.md`),
 | [Snakemake](https://snakemake.github.io/) (`snakemake-minimal`) | 9.27.1 | MIT | multi-sample workflow |
 | [Nextflow](https://www.nextflow.io/) | 26.10.6 | Apache-2.0 | multi-sample workflow |
 | [R](https://www.r-project.org/) (`r-base`, env `ngs-r`) | 4.6.2 | GPL-2.0-or-later | statistics (step 9b), base R only |
+| [Kraken2](https://github.com/DerrickWood/kraken2) (env `ngs-kraken`, optional) | 2.17.2 | GPL-3.0-or-later | read classification (step 5d) |
+| [Bracken](https://github.com/jenniferlu717/Bracken) (env `ngs-kraken`, optional) | 3.1 | GPL-3.0-or-later | species abundance re-estimation (step 5d) |
 | [Python](https://www.python.org/) | 3.11 | PSF License | runs the scripts |
 | [Polars](https://pola.rs/) | 2.1.0 | MIT | tables and reports |
 | [Biopython](https://biopython.org/) | 1.88 | Biopython License Agreement / BSD-3-Clause | downloading references from NCBI |
@@ -34,13 +36,16 @@ These are installed separately into conda environments (see `Prerequisites.md`),
 
 The licenses come from the conda package metadata of the versions listed (`~/miniforge3/envs/<env>/conda-meta/*.json`). Newer versions may change them. Check that metadata, or each project's own license file, before redistributing.
 
-**About the GPL tools (BWA, BCFtools, R):** this repository only calls them as separate programs. It does not contain, modify or link to their code, so their licenses don't change how you can use the MIT-licensed code here. If you **redistribute** the tools themselves, for example in a Docker image or a bundled installer, you must follow their licenses, which includes making their source code available.
+**About the GPL tools (BWA, BCFtools, R, Kraken2, Bracken):** this repository only calls them as separate programs. It does not contain, modify or link to their code, so their licenses don't change how you can use the MIT-licensed code here. If you **redistribute** the tools themselves, for example in a Docker image or a bundled installer, you must follow their licenses, which includes making their source code available.
 
 ## Data
 
 - **Sequencing reads** are downloaded at run time from the [European Nucleotide Archive (ENA)](https://www.ebi.ac.uk/ena/browser/), which mirrors NCBI SRA and DDBJ through the International Nucleotide Sequence Database Collaboration (INSDC).
 - **Reference genomes** are downloaded at run time from [NCBI Nucleotide / RefSeq](https://www.ncbi.nlm.nih.gov/nuccore).
 - **SnpEff databases** are downloaded by `snpEff download` from the SnpEff project.
+- **Kraken2 databases** (optional, step 5d) are downloaded by you, e.g. the prebuilt indexes at https://benlangmead.github.io/aws-indexes/k2. They are built from NCBI RefSeq and other public sources; check the page for each database's sources and terms.
+- **A host genome** for host removal (optional, step 5b) is supplied by you. `Prerequisites.md` suggests the human T2T-CHM13 assembly from the Human Pangenome Reference Consortium's public bucket; check the consortium's data-use terms before redistributing it.
+- **The reference screen** (step 5c, and option `0` at question 4 of the interactive script) downloads the built-in references and two human decoy sequences (the rDNA repeat `U13369.1` and the mitochondrial genome `NC_012920.1`) from NCBI once into `~/.cache/ngs_pipeline/reference_screen/`, and for option `0` on an SRA run streams the first 50,000 reads from ENA. Neither is stored in this repository.
 
 INSDC and NCBI make public sequence data available without restrictions on use. However, NCBI notes that original submitters may claim patent, copyright or other rights in the data they submitted. You are responsible for checking the terms for any dataset you use.
 
