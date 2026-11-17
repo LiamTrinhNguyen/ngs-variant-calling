@@ -1,0 +1,341 @@
+# =============================================================================
+# Snakemake workflow – NGS variant calling for many samples
+# =============================================================================
+# WHAT: runs the same steps as run_interactive_pipeline.py for every sample
+#       listed in config/config.yaml, then builds ONE dashboard for all of
+#       them (results/07_dashboard/dashboard.html, with the CSV tables viewable
+#       in the page and saved as files for Power BI/Excel).
+# WHY:  - many samples in one command, in parallel (-c N cores)
+#       - re-running only redoes steps whose output is missing (resumes after a crash)
+#       - all settings live in a file, so a run can be repeated exactly
+#
+# Each rule calls a function from run_interactive_pipeline.py.
+# WHY: the commands and filters are defined in one place, so both ways of
+#      running give the same results.
+#
+# Usage (from ngs-variant-calling/, with ngs-env active):
+#   snakemake -s workflow/Snakefile -n          # dry run: show what would run
+#   snakemake -s workflow/Snakefile -c 4        # run with 4 cores
+#   snakemake -s workflow/Snakefile -c 4 --configfile my_config.yaml
+#
+# Step 9b (rule r_stats) runs R/variant_stats.R with Rscript from the `ngs-r`
+# env (found by ngs.find_rscript()). The same steps are also available as a
+# Nextflow pipeline: workflow/main.nf.
+# =============================================================================
+
+import re
+import sys
+from pathlib import Path
+
+# Load the step functions from the interactive script (one folder up)
+PIPELINE_DIR = Path(workflow.basedir).parent
+sys.path.insert(0, str(PIPELINE_DIR))
+import run_interactive_pipeline as ngs
+import dashboard
+
+# Settings: config/config.yaml, unless you pass your own with --configfile.
+# WHY not the `configfile:` directive: Snakemake MERGES --configfile into it,
+#      so the default file's samples were silently added to your own list.
+#      Here your file REPLACES the default; --config key=value still overrides.
+import yaml
+with open(PIPELINE_DIR / "config" / "config.yaml") as _fh:
+    _default = yaml.safe_load(_fh)
+if "samples" in config:          # your own --configfile: use it as-is
+    _merged = {k: v for k, v in _default.items() if k != "samples"}
+    _merged.update(config)
+else:                            # no --configfile: default file + any --config overrides
+    _merged = {**_default, **config}
+config.clear()
+config.update(_merged)
+
+OUT      = config["outdir"]
+REF      = config["reference"]
+REF_FA   = f"{OUT}/01_reference/{REF}.fasta"
+SAMPLES  = list(config["samples"])
+THREADS  = int(config.get("threads", 4))
+
+# Decide once, up front, whether annotation can run for this reference.
+# WHY: SnpEff only works when its database matches the reference (see
+#      SNPEFF_DB in the script). No match → the annotate rule is skipped.
+SNPEFF_GENOME = ngs.SNPEFF_DB.get(REF)
+
+# Sample names must be exactly the names in config.yaml.
+# WHY: stops Snakemake guessing a sample name from a similar-looking file name.
+wildcard_constraints:
+    sample = "|".join(re.escape(s) for s in SAMPLES)
+
+
+# Warn at the start if annotation will be skipped
+# WHY: you know before the run, not after, that Effect/Impact/Gene will be empty
+onstart:
+    if SNPEFF_GENOME is None:
+        ngs.log.warning(
+            f"Reference {REF} has no entry in SNPEFF_DB – annotation will be skipped "
+            "and reports will have empty Effect/Impact/Gene columns."
+        )
+
+
+# -----------------------------------------------------------------------------
+# rule all – the goal: one report + R statistics per sample, and the dashboard covering them all
+#   WHY: Snakemake works backwards from these files and runs only the steps
+#        needed to make them
+# -----------------------------------------------------------------------------
+REPORTS = expand(f"{OUT}/06_reports/{{sample}}.high_confidence_variants.tsv", sample=SAMPLES)
+CALLS   = expand(f"{OUT}/06_reports/{{sample}}.all_calls.tsv", sample=SAMPLES)
+
+R_STATS = expand(f"{OUT}/06_reports/{{sample}}.r_stats.tsv", sample=SAMPLES)
+
+rule all:
+    input:
+        REPORTS,
+        R_STATS,   # WHY listed here too: an existing dashboard.html alone doesn't make Snakemake look for them
+        f"{OUT}/07_dashboard/dashboard.html",
+
+
+def sample_reads(wildcards):
+    """Where a sample's R1/R2 come from: downloaded (sra:) or local files (r1:/r2:)."""
+    s = config["samples"][wildcards.sample]
+    if "sra" in s:
+        return {"r1": f"{OUT}/00_raw/{wildcards.sample}_1.fastq.gz",
+                "r2": f"{OUT}/00_raw/{wildcards.sample}_2.fastq.gz"}
+    if "r1" in s and "r2" in s:
+        # WHY in place: no need to copy large files
+        return {"r1": s["r1"], "r2": s["r2"]}
+    raise ValueError(
+        f"Sample '{wildcards.sample}' needs either 'sra:' or both 'r1:' and 'r2:' in the config"
+    )
+
+
+# -----------------------------------------------------------------------------
+# rule download_reads – STEP 4 · data input (SRA samples only)
+#   WHAT: downloads R1/R2 from ENA into 00_raw/
+#   WHY:  reads are the starting material; local samples skip this rule
+# -----------------------------------------------------------------------------
+rule download_reads:
+    output:
+        r1 = f"{OUT}/00_raw/{{sample}}_1.fastq.gz",
+        r2 = f"{OUT}/00_raw/{{sample}}_2.fastq.gz",
+    run:
+        import shutil
+        acc = config["samples"][wildcards.sample]["sra"]
+        # Download into a private folder per sample, then move into 00_raw/.
+        # WHY: ENA names files after the accession. Two samples downloading at
+        #      the same time (e.g. the same SRR under two names) would otherwise
+        #      write and rename each other's files.
+        tmp = Path(output.r1).parent / f".download_{wildcards.sample}"
+        shutil.rmtree(tmp, ignore_errors=True)
+        tmp.mkdir(parents=True)
+        _, fastqs = ngs.get_sra_metadata_and_fastq(acc, tmp)
+        # WHY: every later rule expects R1 + R2
+        if len(fastqs) != 2:
+            shutil.rmtree(tmp, ignore_errors=True)
+            raise ValueError(f"{acc} is not paired-end; this workflow needs paired reads")
+        for src, dst in zip(fastqs, [output.r1, output.r2]):
+            shutil.move(str(src), dst)
+        shutil.rmtree(tmp, ignore_errors=True)   # also removes any unpaired extra file
+
+
+# -----------------------------------------------------------------------------
+# rule download_reference – STEP 2 · reference genome
+#   WHAT: downloads the reference FASTA from NCBI into 01_reference/
+#   WHY:  variants are found by comparing reads to this genome.
+#         Made once and shared by all samples.
+# -----------------------------------------------------------------------------
+rule download_reference:
+    output:
+        REF_FA,
+    run:
+        ngs.download_reference("unknown", Path(output[0]).parent, force_accession=REF)
+
+
+# -----------------------------------------------------------------------------
+# rule index_reference – STEP 3 · indexing
+#   WHAT: bwa index + samtools faidx + samtools dict
+#   WHY:  lets BWA and bcftools jump to any position quickly. Built once
+#         for all samples, not once per sample.
+# -----------------------------------------------------------------------------
+rule index_reference:
+    input:
+        REF_FA,
+    output:
+        multiext(REF_FA, ".amb", ".ann", ".bwt", ".pac", ".sa", ".fai"),
+        str(Path(REF_FA).with_suffix(".dict")),
+    run:
+        log_dir = Path(OUT) / "logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        ngs.index_reference(Path(input[0]), log_dir)
+
+
+# -----------------------------------------------------------------------------
+# rule fastp – STEP 5 · QC & trimming
+#   WHAT: removes adapters and low-quality bases → 02_qc/ (+ HTML report)
+#   WHY:  sequencing errors and adapters would otherwise look like mutations
+# -----------------------------------------------------------------------------
+rule fastp:
+    input:
+        unpack(sample_reads),
+    output:
+        r1   = f"{OUT}/02_qc/{{sample}}_R1.trimmed.fastq.gz",
+        r2   = f"{OUT}/02_qc/{{sample}}_R2.trimmed.fastq.gz",
+        html = f"{OUT}/02_qc/{{sample}}.fastp.html",
+        json = f"{OUT}/02_qc/{{sample}}.fastp.json",
+    threads: THREADS
+    run:
+        ngs.run_fastp(Path(input.r1), Path(input.r2), Path(output.r1).parent,
+                      wildcards.sample, threads)
+
+
+# -----------------------------------------------------------------------------
+# rule align – STEP 6 · alignment
+#   WHAT: BWA-MEM places reads on the reference; samtools sorts and indexes
+#         → 03_aligned/<sample>.sorted.bam
+#   WHY:  reads must be lined up on the genome before differences can be seen
+# -----------------------------------------------------------------------------
+rule align:
+    input:
+        ref = REF_FA,
+        idx = rules.index_reference.output,   # wait until the index exists
+        r1  = rules.fastp.output.r1,          # use the cleaned reads
+        r2  = rules.fastp.output.r2,
+    output:
+        bam = f"{OUT}/03_aligned/{{sample}}.sorted.bam",
+        bai = f"{OUT}/03_aligned/{{sample}}.sorted.bam.bai",
+    threads: THREADS
+    run:
+        ngs.align_and_sort(Path(input.ref), Path(input.r1), Path(input.r2),
+                           Path(output.bam).parent, wildcards.sample, threads)
+
+
+# -----------------------------------------------------------------------------
+# rule call_variants – STEP 7 · variant calling
+#   WHAT: bcftools mpileup (-q 20 -Q 20 -d 10000, records AD/DP) | call --ploidy 1
+#         | norm → 04_variants/<sample>.raw.vcf.gz
+#   WHY:  finds the positions where the sample differs from the reference, using
+#         only good-quality reads and bases; haploid because bacteria and viruses
+#         have one genome copy; normalized so the same variant is always written
+#         the same way. (Settings: MIN_MAPQ / MIN_BASEQ / MAX_DEPTH in the script.)
+# -----------------------------------------------------------------------------
+rule call_variants:
+    input:
+        ref = REF_FA,
+        idx = rules.index_reference.output,
+        bam = rules.align.output.bam,
+        bai = rules.align.output.bai,
+    output:
+        vcf = f"{OUT}/04_variants/{{sample}}.raw.vcf.gz",
+        csi = f"{OUT}/04_variants/{{sample}}.raw.vcf.gz.csi",
+        settings = f"{OUT}/04_variants/{{sample}}.calling_settings.json",   # what was run (shown in the dashboard)
+    run:
+        ngs.call_variants(Path(input.ref), Path(input.bam),
+                          Path(output.vcf).parent, wildcards.sample)
+
+
+# -----------------------------------------------------------------------------
+# rule annotate – STEP 8 · annotation (only if the reference is in SNPEFF_DB)
+#   WHAT: SnpEff adds gene, effect and impact → 05_annotated/<sample>.ann.vcf.gz
+#   WHY:  tells you whether a variant changes a gene or protein.
+#   NOTE: if SnpEff fails, the run STOPS (the interactive script continues).
+#         WHY: in a batch, a missing database would otherwise give every sample
+#         an unannotated report without anyone noticing. Fix it
+#         (e.g. snpEff download -v <db>) and run again; finished steps are kept.
+# -----------------------------------------------------------------------------
+rule annotate:
+    input:
+        vcf = rules.call_variants.output.vcf,
+    output:
+        vcf = f"{OUT}/05_annotated/{{sample}}.ann.vcf.gz",
+        tbi = f"{OUT}/05_annotated/{{sample}}.ann.vcf.gz.tbi",
+    run:
+        ngs.annotate_variants(Path(input.vcf), SNPEFF_GENOME,
+                              Path(output.vcf).parent, wildcards.sample)
+
+
+def report_input(wildcards):
+    """Use the annotated VCF if annotation applies, otherwise the raw VCF."""
+    if SNPEFF_GENOME:
+        return f"{OUT}/05_annotated/{wildcards.sample}.ann.vcf.gz"
+    return f"{OUT}/04_variants/{wildcards.sample}.raw.vcf.gz"
+
+
+# -----------------------------------------------------------------------------
+# rule report – STEP 9 · flag & report
+#   WHAT: FLAGS each call that fails QUAL >= min_qual, DP >= min_dp or AF >= min_af
+#         (FILTER = LowQual / LowDepth / LowAF), then writes
+#           <sample>.flagged.vcf.gz             all calls, FILTER set
+#           <sample>.all_calls.tsv              all calls + reason
+#           <sample>.high_confidence_variants.tsv   PASS only
+#   WHY:  flagging instead of deleting keeps an audit trail of what was excluded
+#         and why; the PASS table is the short list worth looking at
+# -----------------------------------------------------------------------------
+rule report:
+    input:
+        report_input,
+    output:
+        report  = f"{OUT}/06_reports/{{sample}}.high_confidence_variants.tsv",
+        calls   = f"{OUT}/06_reports/{{sample}}.all_calls.tsv",
+        flagged = f"{OUT}/06_reports/{{sample}}.flagged.vcf.gz",
+    run:
+        ngs.filter_and_report(
+            Path(input[0]), Path(output.report).parent, wildcards.sample,
+            min_qual=float(config.get("min_qual", ngs.MIN_QUAL)),
+            min_dp=int(config.get("min_dp", ngs.MIN_DP)),
+            min_af=float(config.get("min_af", ngs.MIN_AF)),
+        )
+
+
+# -----------------------------------------------------------------------------
+# rule r_stats – STEP 9b · statistics in R
+#   WHAT: Rscript R/variant_stats.R on <sample>.all_calls.tsv →
+#           <sample>.r_stats.tsv    Ts/Tv + 95% CI, Wilcoxon, Spearman, AF, KS test
+#           <sample>.r_windows.tsv  variants per window + Poisson/BH hotspot test
+#   WHY:  the tables come from Polars (rule report); R adds the statistical
+#         tests, which the dashboard shows in "Statistics from R".
+#   NOTE: like annotate, a failure STOPS the run (the interactive script only warns).
+# -----------------------------------------------------------------------------
+rule r_stats:
+    input:
+        calls = rules.report.output.calls,
+        fai   = REF_FA + ".fai",           # genome length for densities and windows
+    output:
+        stats   = f"{OUT}/06_reports/{{sample}}.r_stats.tsv",
+        windows = f"{OUT}/06_reports/{{sample}}.r_windows.tsv",
+    run:
+        ngs.run_r_stats(Path(input.calls), Path(REF_FA), Path(output.stats).parent,
+                        wildcards.sample, int(config.get("hotspot_window", ngs.HOTSPOT_WINDOW)))
+
+
+# -----------------------------------------------------------------------------
+# rule dashboard – STEP 10 · easy-to-read results for ALL samples
+#   WHAT: 07_dashboard/dashboard.html (open in a browser) +
+#         sample_summary.csv and all_samples_variants.csv (shown in the page's
+#         "Data tables" section, and saved for Power BI / Excel)
+#   WHY:  one page to compare samples, see quality checks and browse variants,
+#         instead of opening many TSV/VCF files
+# -----------------------------------------------------------------------------
+rule dashboard:
+    input:
+        REPORTS,
+        CALLS,   # the dashboard charts every call with its filter reason
+        R_STATS,   # shown in "Statistics from R"
+        # WHY require the settings file: the dashboard shows which quality cut-offs
+        #     were used. Runs made before this file existed are re-called so the
+        #     page never shows settings it can't prove.
+        expand(f"{OUT}/04_variants/{{sample}}.calling_settings.json", sample=SAMPLES),
+        expand(f"{OUT}/02_qc/{{sample}}.fastp.json", sample=SAMPLES),
+        expand(f"{OUT}/03_aligned/{{sample}}.sorted.bam", sample=SAMPLES),
+    output:
+        html    = f"{OUT}/07_dashboard/dashboard.html",
+        summary = f"{OUT}/07_dashboard/sample_summary.csv",
+        table   = f"{OUT}/07_dashboard/all_samples_variants.csv",
+        calls   = f"{OUT}/07_dashboard/all_samples_calls.csv",
+        rstats  = f"{OUT}/07_dashboard/r_statistics.csv",
+        windows = f"{OUT}/07_dashboard/variant_windows.csv",
+    run:
+        dashboard.build_dashboard(
+            Path(OUT),
+            min_qual=float(config.get("min_qual", ngs.MIN_QUAL)),
+            min_dp=int(config.get("min_dp", ngs.MIN_DP)),
+            min_af=float(config.get("min_af", ngs.MIN_AF)),
+            # WHY: only the samples in the config, not old reports left in the folder
+            samples=SAMPLES,
+        )

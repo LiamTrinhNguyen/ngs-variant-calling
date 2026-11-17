@@ -1,110 +1,153 @@
 ## NGS Automated Variant Calling Pipeline
 
-**An interactive Python-based Next-Generation Sequencing (NGS) pipeline for variant detection in *Escherichia coli*.**
+**A Python-based Next-Generation Sequencing (NGS) pipeline that finds variants in bacterial and viral genomes, from raw reads to an interactive results dashboard.**
 
-### Input Modes
+![NGS variant calling workflow](workflow_diagram.svg)
 
-1. **Public SRA Data (Default)**: Automatically fetches paired-end reads from the NCBI Sequence Read Archive (SRA) using `fasterq-dump`.  
-   *(Default sample: SRR39418081)*
+### Start here
 
-2. **Custom Local FASTQ**: Supports user-provided paired-end files (`_1.fastq` and `_2.fastq`) placed in the `data/` directory.
-
----
-
-### Biological & Analytical Rationale
-
-This pipeline follows rigorous microbial NGS best practices:
-
-- **Integrated QC & Trimming**: Uses **fastp** for high-performance adapter trimming, quality filtering, and base correction in a single efficient pass.
-- **Statistical Precision**: Employs **BCFtools** for variant calling, combined with an automated **Polars** filtering layer that removes low-confidence calls (DP < 15, QUAL ≤ 30).
-- **Functional Annotation**: Integrates **SnpEff** to predict the biological impact of variants (e.g., missense, synonymous, frameshift, stop-gain).
-- **Resource Management**: Automatic cleanup of large intermediate files (SAM, raw FASTQs) to maintain a minimal storage footprint.
+| # | Read | For |
+|---|------|-----|
+| 1 | [workflow_diagram.svg](workflow_diagram.svg) | The big picture: every step and why it's there |
+| 2 | [Prerequisites.md](Prerequisites.md) | One-time install (Miniforge, the `ngs-env` environment, SnpEff database) |
+| 3 | [workflow_run.md](workflow_run.md) | How to run it and fix common problems |
+| 4 | [reading_results.md](reading_results.md) | How to read the dashboard and judge a sample, with a worked example |
+| 5 | [integrate_claude.md](integrate_claude.md) | Optional: using Claude Code to run or extend the workflow |
 
 ---
 
-### Prerequisites
+### Three ways to run it
 
-- **Environment**: Linux (recommended: GitHub Codespaces or Ubuntu)
-- **Package Manager**: Conda or Mamba
-- **Core Dependencies**:
-  - `fastp`, `bwa`, `samtools`, `bcftools`, `snpEff` (v5.1+)
-  - OpenJDK 11
-  - Python packages: `polars`, `tqdm`
-- **Storage**: Approximately **2–4 GB** of free disk space (optimized pipeline)
+All three run the **same steps** with the same settings, because the Snakemake rules and the Nextflow processes call the functions in the interactive script. On the same input they give identical results.
+
+| | Interactive script | Snakemake workflow | Nextflow pipeline |
+|---|---|---|---|
+| Command | `python3 run_interactive_pipeline.py` | `snakemake -s workflow/Snakefile -c 4` | `bash workflow/run_nextflow.sh` |
+| Input | 4 questions, each with examples | `config/config.yaml` (list of samples) | the same `config/config.yaml` |
+| Samples | 1 per run | Many, in parallel | Many, in parallel |
+| Re-run | Repeats every step | Only redoes what's missing; resumes after a crash | `-resume` reuses finished steps |
+| Output folder | `NGS_run/` | `results/` | `results_nf/` (+ `pipeline_info/` run report) |
+| Runs on | This machine | This machine (or a cluster with a profile) | This machine, SLURM/PBS or the cloud: change `executor` in `workflow/nextflow.config` |
+
+### Languages: who does what
+
+| Language | Where | Job |
+|---|---|---|
+| **Python** + **Polars** | `run_interactive_pipeline.py`, `dashboard.py` | Runs the tools, builds the variant tables (Polars), builds the dashboard |
+| **R** (base R only) | `R/variant_stats.R` | Statistical tests on the calls: Ts/Tv with 95% CI, Wilcoxon, Spearman, KS, Poisson hotspot windows |
+| **Snakemake** / **Nextflow** | `workflow/Snakefile`, `workflow/main.nf` | Run the steps for many samples, in parallel and resumable |
+| **HTML/JavaScript** | inside `dashboard.html` | Interactive charts and tables, no internet needed |
+
+### Input options
+
+1. **Public SRA data:** enter a run accession such as `SRR1553607`. Paired-end reads and metadata (organism, platform, read count) are downloaded from ENA over HTTPS.
+2. **Your own FASTQ files:** enter the path to the R1 file. R2 is found automatically (`_R1`→`_R2`, `_1`→`_2`, `_R1_001`→`_R2_001`). You also give a reference accession, because local files carry no organism name.
+
+The reference genome is chosen from the organism name, for example E. coli, Salmonella, S. aureus, M. tuberculosis, Ebola viruses or SARS-CoV-2. You can also give any RefSeq accession, such as `NC_002549.1`.
 
 ---
 
-### Pipeline Steps Overview
+### Biological & analytical rationale
 
-| Step | Tool                  | Purpose                                      | Biological Reasoning                                      |
-|------|-----------------------|----------------------------------------------|-----------------------------------------------------------|
-| 1    | Setup                 | Create organized directories                 | Maintains reproducibility and prevents data mixing        |
-| 2    | Reference             | Download *E. coli* K-12 reference genome     | Provides a trusted baseline for accurate comparison       |
-| 3    | Indexing              | Build BWA and samtools indices               | Enables fast and accurate read mapping                    |
-| 4    | Data Input            | Download from SRA or use local FASTQ         | Flexibility for public or private datasets                |
-| 5    | fastp                 | QC, trimming, and base correction            | Removes noise/adapters; generates QC metrics              |
-| 6    | BWA-MEM + Samtools    | Align reads and prepare BAM files            | Accurate mapping to reference genome                      |
-| 7    | BCFtools              | Variant calling                              | Statistical identification of true mutations              |
-| 8    | SnpEff                | Functional annotation                        | Predicts biological impact of variants                    |
-| 9    | Polars                | Data filtering & reporting                   | Extracts high-confidence signals from VCF noise           |
+- **Integrated QC & trimming:** **fastp** trims adapters, filters low-quality reads and corrects bases in one pass.
+- **Careful variant calling:** **BCFtools** counts only good evidence: reads with mapping quality ≥ 20 and bases with quality ≥ 20, up to 10,000 reads per position so deep data isn't cut off. It calls **haploid** (`--ploidy 1`), because bacteria and viruses carry one genome copy and diploid calling produces artifact heterozygous calls. Indels are **normalized** (`bcftools norm`), so the same variant is always written the same way.
+- **Three-part confidence filter, flagged rather than deleted:** a call is PASS only if **QUAL ≥ 30, good-quality depth (DP) ≥ 15 and allele frequency (AF) ≥ 80%**. Failing calls keep a reason in the VCF FILTER column (`LowQual` / `LowDepth` / `LowAF`), so there's an audit trail of what was excluded and why. The AF rule catches mixed samples or contamination: in a haploid genome a real variant is in (nearly) all reads.
+- **Functional annotation:** **SnpEff** predicts the effect of each variant (missense, synonymous, stop-gained, …). It runs only when a SnpEff database matching the reference is listed in `SNPEFF_DB`; by default that's E. coli K-12 `NC_000913.3`. Otherwise it is skipped with a clear warning.
+- **Readable results:** each run ends with a self-contained HTML dashboard showing quality checks, coverage, filters and a variant table. The CSV files can be viewed in the page (searchable *Data tables*) and also load into Power BI or Excel.
+- **Disk use:** the large intermediate SAM file is deleted after sorting.
 
-## Getting Started
+---
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/yourusername/ngs-variant-calling.git
-   cd ngs-variant-calling
-   ```
-2. **Create and activate the environment**
-   ```Bash
-   conda env create -f environment.yml
-   conda activate ngs-env
-   ```
-   
-3. **Run the pipeline**
-   ```Bash
-   python3 run_interactive_pipeline.py
-   ```
+### Pipeline steps
 
+| Step | Tool | Purpose | Why |
+|------|------|---------|-----|
+| 1 | Setup | Create numbered output folders | Results are easy to find; runs don't mix |
+| 2 | Reference | Download the reference genome from NCBI | A known genome to compare reads against |
+| 3 | Indexing | `bwa index`, `samtools faidx` / `dict` | Fast lookup of any position |
+| 4 | Data input | ENA download or local FASTQ | Public or private data |
+| 5 | fastp | QC, trimming, base correction | Errors and adapters would look like mutations |
+| 6 | BWA-MEM + samtools | Align, sort and index reads | Reads must be placed on the genome first |
+| 7 | BCFtools | Haploid calling from good-quality reads (MAPQ/base Q ≥ 20), indels normalized | Finds where the sample differs from the reference, using only reliable evidence |
+| 8 | SnpEff | Functional annotation (when available) | Shows whether a gene or protein changes |
+| 9 | bcftools filter + Polars | Flag QUAL / depth / AF failures; PASS table + all-calls table | Keeps only well-supported variants, with a record of what was excluded and why |
+| 9b | R (`R/variant_stats.R`) | Ts/Tv + 95% CI, PASS-vs-flagged tests, AF spread, even-spread test, hotspot windows | Checks that the filter works and that the variants look like real mutations; finds regions with more variants than chance |
+| 10 | dashboard.py | HTML dashboard + CSV tables (incl. the R statistics) | Results at a glance in the browser; same tables ready for Power BI or Excel |
 
+---
 
+### Getting started
 
+```bash
+# 1. One-time setup: see Prerequisites.md (creates the ngs-env environment)
 
-## Input Options
+# 2. Activate the environment (every new terminal)
+source ~/miniforge3/bin/activate ngs-env
+cd ngs-variant-calling
 
-   1. **Option1: Public SRA Data (Default)**
-   The pipeline automatically downloads paired-end FASTQ files using fasterq-dump, or enter the SRR number.
-   Default sample: SRR39418081
-   2. **Option2: Custom Local FASTQ Files**
-   
-   Place your paired-end FASTQ files (.fastq or .fastq.gz) in the data/ folder (or any accessible location).
-   When prompted, select Option 2 and enter the base name of your files (without _1 / _2 and extensions).
-   
-   Example:
-   Files: my_sample_1.fastq.gz and my_sample_2.fastq.gz -> Enter: my_sample
+# 3a. One sample, interactive
+python3 run_interactive_pipeline.py
+#     answers: SRR1553607 → 4 → Enter → NC_002549.1
 
-## Outputs
-Each run creates a timestamped folder under results/run_YYYYMMDD_HHMMSS/:
-   - final_variants.vcf – Raw detected mutations.
-   - annotated_variants.vcf – Functional impact predictions (via SnpEff).
-   - fastp.html/json – Comprehensive quality and adapter content reports.
-   - alignment_stats.txt – Alignment mapping rates for data validation.
-   - pipeline_*.log – Full audit trail including the final filtered mutation table.
+# 3b. Or many samples with Snakemake (edit config/config.yaml first)
+snakemake -s workflow/Snakefile -n      # dry run: shows what will run
+snakemake -s workflow/Snakefile -c 4    # real run with 4 cores
 
-## Features
-   - Automated Validation: Step 8 logs the alignment rate and warns if coverage is insufficient.
-   - Data Decomposition: Uses polars to extract Depth (DP), Allele Count (AC), and Effect into a clean, filterable table.
-   - Production-Ready: Includes error handling, auto-cleanup of intermediate SAM/FASTQ files, and Java memory allocation (-Xmx4g) for annotation.
-   - Interactive Dashboard: Single-step initial confirmation followed by fully automated execution.
+# 3c. Or the same samples with Nextflow (same config file)
+bash workflow/run_nextflow.sh           # results in results_nf/ (Nextflow's log, work and cache too)
+bash workflow/run_nextflow.sh -resume   # after a crash or a change: reuse finished steps
 
-## Tools Used
-   - Data Retrieval: SRA-Tools (fasterq-dump)
-   - QC & Trimming: fastp
-   - Contamination Check: Kraken2
-   - Alignment: BWA-MEM + Samtools
-   - Variant Calling: BCFtools
-   - Annotation: SnpEff
-   - Data Processing: Polars + tqdm
+# 4. View the dashboard in your browser (Codespaces)
+python3 -m http.server 8000 --directory results/07_dashboard &   # NGS_run/07_dashboard for 3a
+"$BROWSER" http://localhost:8000/dashboard.html      # results_nf/07_dashboard for 3c
+```
+
+---
+
+### Outputs
+
+Every run writes the same numbered folders: `NGS_run/` for the interactive script (by default), `results/` for Snakemake, or `results_nf/` for Nextflow.
+
+| Folder | Contents |
+|--------|----------|
+| `00_raw/` | Downloaded reads |
+| `01_reference/` | Reference FASTA + index files |
+| `02_qc/` | Trimmed reads, `*.fastp.html` / `.json` quality reports |
+| `03_aligned/` | `*.sorted.bam` + `.bai` |
+| `04_variants/` | `*.raw.vcf.gz`: all calls before filtering (with AD/DP per call) · `*.calling_settings.json`: the exact calling options used |
+| `05_annotated/` | `*.ann.vcf.gz`: SnpEff-annotated VCF (when annotation runs) |
+| `06_reports/` | `*.high_confidence_variants.tsv`: PASS calls (CHROM, POS, REF, ALT, QUAL, DP, AF, Effect, Impact, Gene, HGVS_c, HGVS_p) · `*.all_calls.tsv`: every call + FILTER reason · `*.flagged.vcf.gz`: VCF with FILTER set · `*.r_stats.tsv` / `*.r_windows.tsv`: R statistics and hotspot windows |
+| **`07_dashboard/`** | **`dashboard.html`** (open in any browser, works offline), `sample_summary.csv`, `all_samples_variants.csv`, `all_samples_calls.csv`, `r_statistics.csv`, `variant_windows.csv`. All five CSVs are also shown inside the page. |
+| `pipeline_info/` | Nextflow only: `nextflow.log`, `report.html`, `timeline.html`, `trace.tsv` (time, CPU and memory per step) |
+| `nextflow/` | Nextflow only: `work/` (one folder per task) and `cache/` (used by `-resume`); safe to delete when you no longer need `-resume` |
+
+---
+
+### Tools used
+
+- **Data retrieval:** ENA Portal API + HTTPS (`requests`), NCBI Entrez (`biopython`)
+- **QC & trimming:** fastp
+- **Alignment:** BWA-MEM + samtools
+- **Variant calling:** BCFtools (haploid)
+- **Annotation:** SnpEff (OpenJDK)
+- **Filtering & reporting:** Polars
+- **Statistics:** R (base R, in its own `ngs-r` environment)
+- **Dashboard:** Python + a self-contained HTML/JavaScript page (no extra installs)
+- **Workflow managers:** Snakemake or Nextflow (optional, for many samples)
+
+---
+
+### Known limitations
+
+- Designed for haploid genomes (bacteria, viruses). For diploid organisms, remove `--ploidy 1`.
+- Annotation is set up only for E. coli K-12 by default. Add other references to `SNPEFF_DB` after checking that the database matches.
+- The Snakemake and Nextflow routes need paired-end reads; use the interactive script for single-end data.
+- There is no contamination check (e.g. Kraken2), host-read removal, duplicate marking, primer trimming or consensus FASTA yet.
+- Thresholds (QUAL 30, DP 15, AF 0.8) are common starting points, not validated for a specific assay. Validate them against samples with known variants before clinical or public-health use.
+
+## License
+
+The code and documentation in this repository are released under the [MIT License](LICENSE). The tools the pipeline runs (BWA, SAMtools, BCFtools, fastp, SnpEff, Snakemake, Nextflow, R, …) and the public data it downloads (ENA reads, NCBI references) keep their own licenses and terms. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for the list, and cite those tools if you publish results.
 
 ## Author
 Liam TrinhNguyen

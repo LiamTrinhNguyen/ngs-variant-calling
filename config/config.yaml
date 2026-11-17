@@ -1,0 +1,50 @@
+# Settings for the Snakemake workflow (workflow/Snakefile).
+# WHY a file: it replaces the 4 interactive questions, so a run can be
+#             repeated exactly and can cover many samples at once.
+# Run from ngs-variant-calling/:   snakemake -s workflow/Snakefile -c 4
+#                       or:        nextflow run workflow/main.nf     (same file)
+# Using your own file?  --configfile my.yaml  REPLACES this file (samples included).
+
+# Where all results go (same 00_raw … 07_dashboard folders as the interactive script).
+# Open <outdir>/07_dashboard/dashboard.html when the run finishes.
+# A relative path is relative to the folder you run snakemake from.
+outdir: results
+
+# Reference genome (RefSeq accession), used for ALL samples in this file.
+# WHY one reference: samples are only comparable against the same genome.
+# Annotation only runs if this accession is in SNPEFF_DB (default: only NC_000913.3).
+#   e.g. NC_002549.1 (Zaire ebolavirus)   NC_000913.3 (E. coli K-12)
+#        NC_045512.2 (SARS-CoV-2)         NC_003198.1 (Salmonella enterica)
+reference: NC_002549.1
+
+# CPU threads per step (fastp, bwa mem, samtools sort).
+# snakemake -c sets the total for the whole run.
+threads: 4
+
+# Report filters: a call is PASS only if QUAL >= min_qual AND DP >= min_dp AND AF >= min_af.
+# Failing calls are FLAGGED (LowQual / LowDepth / LowAF), not deleted.
+# WHY all three:
+#   QUAL = caller confidence.
+#   DP   = number of GOOD-quality reads (mapping quality >= 20, base quality >= 20).
+#   AF   = share of those reads showing the variant. In a haploid genome a real
+#          variant is in (nearly) all reads; 50–80% suggests a mixed sample or error.
+# After changing these:  snakemake -s workflow/Snakefile -c 4 --forcerun report
+min_qual: 30
+min_dp: 15
+min_af: 0.8
+
+# Window size (bp) for the hotspot test in the R statistics step (9b).
+# WHY 1000: about 19 windows on Ebola (19 kb); use 10000 or more for bacteria (~5 Mb).
+hotspot_window: 1000
+
+# Samples to run. The name on the left is used for the output file names.
+# Each sample is paired-end and is EITHER
+#   sra: <run accession>       downloaded from ENA, or
+#   r1:/r2: <local FASTQ>      read where they are (not copied).
+samples:
+  SRR1553607:
+    sra: SRR1553607
+
+  # my_sample:
+  #   r1: /path/to/my_sample_R1.fastq.gz
+  #   r2: /path/to/my_sample_R2.fastq.gz

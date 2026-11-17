@@ -1,0 +1,251 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 1580" width="720" height="1580" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <title>NGS variant calling workflow (compact) – run_interactive_pipeline.py, Snakemake and Nextflow (animated)</title>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#64748b"/>
+    </marker>
+    <style>
+      .box   { stroke-width: 1.5; rx: 10; }
+      .title { font-size: 14px; font-weight: 600; fill: #0f172a; }
+      .txt   { font-size: 12px; fill: #334155; }
+      .mono  { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace; font-size: 11.5px; fill: #334155; }
+      .cmd   { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace; font-size: 10.5px; fill: #0f172a; }
+      .rule  { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace; font-size: 10.5px; fill: #a21caf; }
+      .flow  { stroke: #64748b; stroke-width: 1.6; fill: none; }
+      .lbl   { font-size: 12px; font-weight: 600; fill: #475569; }
+      .p-run { fill: #fae8ff; stroke: #a21caf; }
+      .p-in  { fill: #e0f2fe; stroke: #0369a1; }
+      .p-ref { fill: #ccfbf1; stroke: #0f766e; }
+      .p-aln { fill: #ede9fe; stroke: #6d28d9; }
+      .p-ann { fill: #fef3c7; stroke: #b45309; }
+      .p-rep { fill: #dcfce7; stroke: #15803d; }
+      .p-dec { fill: #f1f5f9; stroke: #475569; }
+      .p-st  { fill: #ffe4e6; stroke: #be123c; }
+
+      /* ---------------- animation ----------------
+         1. reveal : each step fades/slides in, top to bottom (delay = --d)
+         2. flow   : dashes move along the arrows, showing data passing down
+         3. pulse  : a highlight runs through the steps in execution order,
+                     looping every 14.4 s (12 stages × 1.2 s; delay = --p)
+         fill-mode "both" keeps the finished diagram visible after the reveal,
+         and renderers without animation support show the complete diagram. */
+      .step  { animation: reveal 0.6s ease-out both; animation-delay: var(--d, 0s); }
+      .flow  { stroke-dasharray: 6 4; animation: flow 0.9s linear infinite; }
+      .pulse { animation: pulse 14.4s ease-in-out infinite; animation-delay: var(--p, 0s); }
+
+      @keyframes reveal {
+        from { opacity: 0; transform: translateY(10px); }
+        to   { opacity: 1; transform: translateY(0); }
+      }
+      @keyframes flow {
+        to { stroke-dashoffset: -10; }
+      }
+      @keyframes pulse {
+        0%, 8%, 100% { stroke-width: 1.5; }
+        4%           { stroke-width: 4.5; }
+      }
+
+      /* Respect the viewer's "reduce motion" setting: show the static diagram. */
+      @media (prefers-reduced-motion: reduce) {
+        .step, .flow, .pulse { animation: none; }
+      }
+    </style>
+  </defs>
+
+  <rect width="720" height="1580" fill="#f8fafc"/>
+
+  <!-- heading (static) -->
+  <text x="60" y="44" font-size="22" font-weight="700" fill="#0f172a">NGS variant calling workflow</text>
+  <text x="60" y="68" font-size="13" fill="#64748b">raw reads → trusted variants → dashboard · three entry points · haploid genomes (bacteria &amp; viruses)</text>
+  <text x="100" y="96" font-size="12" font-weight="600" fill="#94a3b8" letter-spacing="0.06em">ENTRY POINTS</text>
+
+  <!-- ============ ENTRY POINTS ============ -->
+  <g class="step" style="--d:0.2s">
+    <rect class="box p-run pulse" style="--p:7.0s" x="100" y="104" width="270" height="96"/>
+    <text class="title" x="116" y="128">A · Interactive script</text>
+    <text class="cmd" x="116" y="148">python3 run_interactive_pipeline.py</text>
+    <text class="txt" x="116" y="168">one sample · answers 4 prompts</text>
+    <text class="txt" x="116" y="186">SnpEff failure → falls back to raw VCF</text>
+
+    <rect class="box p-run pulse" style="--p:7.0s" x="390" y="104" width="270" height="96"/>
+    <text class="title" x="406" y="128">B · Snakemake  ·  C · Nextflow</text>
+    <text class="cmd" x="406" y="148">snakemake -s workflow/Snakefile -c 4</text>
+    <text class="cmd" x="406" y="166">bash workflow/run_nextflow.sh</text>
+    <text class="txt" x="406" y="186">many samples · one config · resume</text>
+
+  </g>
+
+  <!-- ============ 1. INPUT ============ -->
+  <g class="step" style="--d:0.8s">
+    <path class="flow" d="M235,200 V215 H380"/>
+    <path class="flow" d="M525,200 V215 H380 V228" marker-end="url(#arrow)"/>
+
+    <rect class="box p-in pulse" style="--p:8.2s" x="100" y="230" width="560" height="60"/>
+    <text class="title" x="120" y="254">1 · Sample input</text>
+    <text class="rule" x="644" y="254" text-anchor="end">config/config.yaml</text>
+    <text class="txt" x="120" y="274">A: 4 prompts · B/C: config.yaml (samples, reference, threads, filters)</text>
+
+  </g>
+
+  <!-- ============ READS: SRA / LOCAL ============ -->
+  <g class="step" style="--d:1.4s">
+    <path class="flow" d="M380,290 V305 H235 V318" marker-end="url(#arrow)"/>
+    <path class="flow" d="M380,305 H525 V318" marker-end="url(#arrow)"/>
+
+    <rect class="box p-in pulse" style="--p:9.4s" x="100" y="320" width="270" height="80"/>
+    <text class="title" x="116" y="344">SRA accession</text>
+    <text class="rule" x="354" y="344" text-anchor="end">rule download_reads</text>
+    <text class="txt" x="116" y="364">ENA API → HTTPS download → <tspan class="mono">00_raw/</tspan></text>
+    <text class="txt" x="116" y="382">mates chosen by <tspan class="mono">_1</tspan> / <tspan class="mono">_2</tspan> file name</text>
+
+    <rect class="box p-in pulse" style="--p:9.4s" x="390" y="320" width="270" height="80"/>
+    <text class="title" x="406" y="344">Local FASTQ</text>
+    <text class="txt" x="406" y="364">A: R2 found by end-anchored regex</text>
+    <text class="txt" x="406" y="382">B: r1/r2 paths read in place</text>
+
+  </g>
+
+  <!-- ============ 2–3. REFERENCE ============ -->
+  <g class="step" style="--d:2.0s">
+    <path class="flow" d="M235,400 V420 H380"/>
+    <path class="flow" d="M525,400 V420 H380 V438" marker-end="url(#arrow)"/>
+
+    <rect class="box p-ref pulse" style="--p:10.6s" x="100" y="440" width="560" height="80"/>
+    <text class="title" x="120" y="464">2–3 · Reference genome &amp; index</text>
+    <text class="rule" x="644" y="464" text-anchor="end">rules download_reference · index_reference</text>
+    <text class="txt" x="120" y="484">forced accession, else <tspan class="mono">REF_MAP[organism]</tspan> → NCBI Entrez → <tspan class="mono">01_reference/</tspan></text>
+    <text class="txt" x="120" y="502"><tspan class="mono">bwa index</tspan> · <tspan class="mono">samtools faidx</tspan> · <tspan class="mono">samtools dict</tspan> · built once, shared by all samples</text>
+
+  </g>
+
+  <!-- ============ 4. FASTP ============ -->
+  <g class="step" style="--d:2.6s">
+    <line class="flow" x1="380" y1="520" x2="380" y2="548" marker-end="url(#arrow)"/>
+
+    <rect class="box p-ref pulse" style="--p:11.8s" x="100" y="550" width="560" height="70"/>
+    <text class="title" x="120" y="576">4 · QC &amp; trimming: fastp</text>
+    <text class="rule" x="644" y="576" text-anchor="end">rule fastp</text>
+    <text class="txt" x="120" y="598">adapters auto-detected · Q ≥ 20 · length ≥ 30 · base correction → <tspan class="mono">02_qc/</tspan></text>
+
+  </g>
+
+  <!-- ============ 5. ALIGN ============ -->
+  <g class="step" style="--d:3.2s">
+    <line class="flow" x1="380" y1="620" x2="380" y2="648" marker-end="url(#arrow)"/>
+
+    <rect class="box p-aln pulse" style="--p:13.0s" x="100" y="650" width="560" height="70"/>
+    <text class="title" x="120" y="676">5 · Alignment: BWA-MEM + samtools</text>
+    <text class="rule" x="644" y="676" text-anchor="end">rule align</text>
+    <text class="txt" x="120" y="698">read group added · sort · index → <tspan class="mono">03_aligned/*.sorted.bam</tspan> (SAM deleted)</text>
+
+  </g>
+
+  <!-- ============ 6. CALL ============ -->
+  <g class="step" style="--d:3.8s">
+    <line class="flow" x1="380" y1="720" x2="380" y2="748" marker-end="url(#arrow)"/>
+
+    <rect class="box p-aln pulse" style="--p:14.2s" x="100" y="750" width="560" height="70"/>
+    <text class="title" x="120" y="776">6 · Variant calling: bcftools</text>
+    <text class="rule" x="644" y="776" text-anchor="end">rule call_variants</text>
+    <text class="mono" x="120" y="796">mpileup -q 20 -Q 20 -d 10000 -a AD,DP | call --ploidy 1 | norm</text>
+    <text class="txt" x="120" y="812">→ <tspan class="mono">04_variants/*.raw.vcf.gz</tspan> + <tspan class="mono">calling_settings.json</tspan></text>
+
+  </g>
+
+  <!-- ============ DECISION ============ -->
+  <g class="step" style="--d:4.4s">
+    <line class="flow" x1="380" y1="820" x2="380" y2="843" marker-end="url(#arrow)"/>
+
+    <polygon class="p-dec pulse" style="--p:15.4s" stroke-width="1.5" points="380,845 500,890 380,935 260,890"/>
+    <text class="title" x="380" y="886" text-anchor="middle">Reference in</text>
+    <text class="mono" x="380" y="904" text-anchor="middle" font-weight="600">SNPEFF_DB?</text>
+
+  </g>
+
+  <!-- ============ BRANCHES ============ -->
+  <g class="step" style="--d:5.0s">
+    <path class="flow" d="M260,890 H215 V968" marker-end="url(#arrow)"/>
+    <path class="flow" d="M500,890 H545 V968" marker-end="url(#arrow)"/>
+    <text class="lbl" x="226" y="882">no</text>
+    <text class="lbl" x="512" y="882">yes</text>
+
+    <rect class="box p-dec pulse" style="--p:16.6s" x="100" y="970" width="230" height="96"/>
+    <text class="title" x="116" y="994">Skip annotation</text>
+    <text class="txt" x="116" y="1014">warning explains how to add one</text>
+    <text class="txt" x="116" y="1032">report built from the raw VCF</text>
+    <text class="txt" x="116" y="1050">B/C: annotate step not scheduled</text>
+
+    <rect class="box p-ann pulse" style="--p:16.6s" x="430" y="970" width="230" height="96"/>
+    <text class="title" x="446" y="994">7 · SnpEff annotation</text>
+    <text class="txt" x="446" y="1014">bgzip + tabix → <tspan class="mono">05_annotated/</tspan></text>
+    <text class="txt" x="446" y="1032">A: on failure → use raw VCF</text>
+    <text class="txt" x="446" y="1050">B/C: annotate failure stops the run</text>
+  </g>
+
+  <!-- ============ 8. REPORT ============ -->
+  <g class="step" style="--d:5.6s">
+    <path class="flow" d="M215,1066 V1081 H380"/>
+    <path class="flow" d="M545,1066 V1081 H380 V1098" marker-end="url(#arrow)"/>
+
+    <rect class="box p-rep pulse" style="--p:17.8s" x="100" y="1100" width="560" height="80"/>
+    <text class="title" x="120" y="1124">8 · Flag &amp; report: bcftools filter + Polars</text>
+    <text class="rule" x="644" y="1124" text-anchor="end">rule report</text>
+    <text class="txt" x="120" y="1144">PASS = <tspan font-weight="700">QUAL ≥ 30 · DP ≥ 15 · AF ≥ 80%</tspan>; others flagged LowQual/LowDepth/LowAF</text>
+    <text class="txt" x="120" y="1162">→ <tspan class="mono">flagged.vcf.gz · all_calls.tsv · high_confidence_variants.tsv</tspan></text>
+
+  </g>
+
+  <!-- ============ 9b. STATISTICS (R) ============ -->
+  <g class="step" style="--d:6.2s">
+    <line class="flow" x1="380" y1="1180" x2="380" y2="1208" marker-end="url(#arrow)"/>
+
+    <rect class="box p-st pulse" style="--p:19.0s" x="100" y="1210" width="560" height="80"/>
+    <text class="title" x="120" y="1234">9b · Statistics: R (<tspan class="mono">R/variant_stats.R</tspan>)</text>
+    <text class="rule" x="644" y="1234" text-anchor="end">rule r_stats · R_STATS</text>
+    <text class="txt" x="120" y="1254">Ts/Tv + 95% CI · Wilcoxon · Spearman · KS · Poisson/BH hotspot windows</text>
+    <text class="txt" x="120" y="1272">→ <tspan class="mono">06_reports/*.r_stats.tsv · *.r_windows.tsv</tspan> (base R, env ngs-r)</text>
+
+  </g>
+
+  <!-- ============ 10. DASHBOARD ============ -->
+  <g class="step" style="--d:6.8s">
+    <line class="flow" x1="380" y1="1290" x2="380" y2="1308" marker-end="url(#arrow)"/>
+
+    <rect class="box p-rep pulse" style="--p:20.2s" x="100" y="1310" width="560" height="80"/>
+    <text class="title" x="120" y="1334">10 · Dashboard: dashboard.py → <tspan class="mono">07_dashboard/</tspan></text>
+    <text class="rule" x="644" y="1334" text-anchor="end">rule dashboard · DASHBOARD</text>
+    <text class="txt" x="120" y="1354"><tspan class="mono">dashboard.html</tspan>: QC, depth, AF, filter reasons, R statistics, data tables</text>
+    <text class="txt" x="120" y="1372">+ 5 CSVs: <tspan class="mono">sample_summary · all_samples_* · r_statistics · variant_windows</tspan></text>
+
+  </g>
+
+  <!-- ============ REPORT COLUMNS + LEGEND ============ -->
+  <g class="step" style="--d:7.4s">
+    <text x="100" y="1416" font-size="11" font-weight="700" fill="#94a3b8" letter-spacing="0.06em">REPORT COLUMNS</text>
+    <rect x="100" y="1424" width="560" height="28" rx="6" fill="#ffffff" stroke="#cbd5e1"/>
+    <text class="mono" x="114" y="1443">CHROM POS REF ALT QUAL DP AF Effect Impact Gene HGVS_c HGVS_p  (+ FILTER)</text>
+
+    <g font-size="12" fill="#475569">
+      <rect x="100" y="1470" width="14" height="14" rx="3" fill="#fae8ff" stroke="#a21caf" stroke-width="1.2"/>
+      <text x="120" y="1482">Entry point</text>
+      <rect x="240" y="1470" width="14" height="14" rx="3" fill="#e0f2fe" stroke="#0369a1" stroke-width="1.2"/>
+      <text x="260" y="1482">Input</text>
+      <rect x="350" y="1470" width="14" height="14" rx="3" fill="#ccfbf1" stroke="#0f766e" stroke-width="1.2"/>
+      <text x="370" y="1482">Reference &amp; QC</text>
+      <rect x="500" y="1470" width="14" height="14" rx="3" fill="#ede9fe" stroke="#6d28d9" stroke-width="1.2"/>
+      <text x="520" y="1482">Align &amp; call</text>
+      <rect x="100" y="1494" width="14" height="14" rx="3" fill="#fef3c7" stroke="#b45309" stroke-width="1.2"/>
+      <text x="120" y="1506">Annotation</text>
+      <rect x="240" y="1494" width="14" height="14" rx="3" fill="#dcfce7" stroke="#15803d" stroke-width="1.2"/>
+      <text x="260" y="1506">Report</text>
+      <rect x="350" y="1494" width="14" height="14" rx="3" fill="#f1f5f9" stroke="#475569" stroke-width="1.2"/>
+      <text x="370" y="1506">Decision / skip</text>
+      <rect x="500" y="1494" width="14" height="14" rx="3" fill="#ffe4e6" stroke="#be123c" stroke-width="1.2"/>
+      <text x="520" y="1506">Statistics (R)</text>
+      <text x="100" y="1532" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="10.5" fill="#a21caf">rule … · NAME</text>
+      <text x="195" y="1532">= Snakemake rule · Nextflow process</text>
+    </g>
+
+    <text x="60" y="1564" font-size="11" fill="#94a3b8">Guides: workflow_run.md · Prerequisites.md · reading_results.md</text>
+  </g>
+</svg>
