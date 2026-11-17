@@ -15,6 +15,9 @@
 | 5 | [integrate_claude.md](integrate_claude.md) | Optional: using Claude Code to run or extend the workflow |
 
 ---
+### Prerequisites
+Before running the setup script, make sure you have installed all [Prerequisites](Prerequisites.md).
+
 
 ### Three ways to run it
 
