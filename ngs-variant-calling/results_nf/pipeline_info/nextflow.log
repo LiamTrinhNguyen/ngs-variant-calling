@@ -1,0 +1,142 @@
+Nov-17 07:13:16.911 [main] DEBUG nextflow.cli.Launcher - $> nextflow run /workspaces/ngs-variant-calling/ngs-variant-calling/workflow/main.nf --outdir /workspaces/ngs-variant-calling/ngs-variant-calling/results_nf
+Nov-17 07:13:17.055 [main] DEBUG nextflow.cli.CmdRun - N E X T F L O W  ~  version 26.10.6
+Nov-17 07:13:17.096 [main] DEBUG nextflow.plugin.PluginsFacade - Setting up plugin manager > mode=prod; embedded=false; plugins-dir=/home/codespace/.nextflow/plugins; core-plugins: nf-agent-pi@0.6.0,nf-agent@0.2.0,nf-amazon@3.12.1,nf-azure@1.24.4,nf-cloudcache@0.6.2,nf-codecommit@0.6.1,nf-console@1.3.1,nf-google@1.29.1,nf-k8s@1.6.2,nf-seqera@0.26.2,nf-tower@1.32.2,nf-wave@1.22.6
+Nov-17 07:13:17.137 [main] INFO  o.pf4j.DefaultPluginStatusProvider - Enabled plugins: []
+Nov-17 07:13:17.139 [main] INFO  o.pf4j.DefaultPluginStatusProvider - Disabled plugins: []
+Nov-17 07:13:17.143 [main] INFO  org.pf4j.DefaultPluginManager - PF4J version 3.14.1 in 'deployment' mode
+Nov-17 07:13:17.173 [main] DEBUG nextflow.util.RetryConfig - Missing nextflow session - using default retry config
+Nov-17 07:13:17.384 [main] DEBUG nextflow.plugin.PluginUpdater - Using plugin repository: HttpPluginRepository [registry]; url=https://registry.nextflow.io/api
+Nov-17 07:13:17.392 [main] INFO  org.pf4j.AbstractPluginManager - No plugins
+Nov-17 07:13:17.435 [main] DEBUG nextflow.config.ConfigCmdAdapter - Found config base: /workspaces/ngs-variant-calling/ngs-variant-calling/workflow/nextflow.config
+Nov-17 07:13:17.443 [main] DEBUG nextflow.config.ConfigCmdAdapter - Parsing config file: /workspaces/ngs-variant-calling/ngs-variant-calling/workflow/nextflow.config
+Nov-17 07:13:17.453 [main] DEBUG nextflow.config.ConfigParserFactory - Using config parser v2
+Nov-17 07:13:17.469 [main] DEBUG nextflow.config.ConfigBuilder - Applying config profile: `standard`
+Nov-17 07:13:18.502 [main] DEBUG nextflow.plugin.PluginsFacade - Plugins default=[]
+Nov-17 07:13:18.504 [main] DEBUG nextflow.plugin.PluginsFacade - Plugins resolved requirement=[]
+Nov-17 07:13:18.566 [main] DEBUG n.secret.LocalSecretsProvider - Secrets store: /home/codespace/.nextflow/secrets/store.json
+Nov-17 07:13:18.577 [main] DEBUG nextflow.secret.SecretsLoader - Discovered secrets providers: [LocalSecretsProvider] - activable => LocalSecretsProvider
+Nov-17 07:13:18.615 [main] DEBUG nextflow.cli.CmdRun - Launching `/workspaces/ngs-variant-calling/ngs-variant-calling/workflow/main.nf` [hungry_mcclintock] - revision: 8e83f15f38
+Nov-17 07:13:18.866 [main] DEBUG nextflow.Session - Session UUID: 69803db8-ebcc-4fa8-969f-0159c51ac57a
+Nov-17 07:13:18.867 [main] DEBUG nextflow.Session - Run name: hungry_mcclintock
+Nov-17 07:13:18.868 [main] DEBUG nextflow.Session - Executor pool size: 2
+Nov-17 07:13:18.888 [main] DEBUG nextflow.file.FilePorter - File porter settings maxRetries=3; maxTransfers=50; pollTimeout=null
+Nov-17 07:13:18.936 [main] DEBUG nextflow.util.ThreadPoolBuilder - Creating thread pool 'FileTransfer' minSize=10; maxSize=10; workQueue=LinkedBlockingQueue[-1]; allowCoreThreadTimeout=false
+Nov-17 07:13:19.001 [main] DEBUG nextflow.cli.CmdRun - 
+  Version: 26.10.6 build 15032
+  Created: 12-11-2026 23:21 UTC 
+  System: Linux 6.8.0-1070-azure
+  Runtime: Groovy 4.0.33 on OpenJDK 64-Bit Server VM 25.0.2-internal-adhoc.rattler.src
+  Encoding: UTF-8 (UTF-8)
+  Process: 26854@codespaces-dfd2f7 [127.0.0.1]
+  CPUs: 2 - Mem: 7.8 GB (734.4 MB) - Swap: 0 (0)
+Nov-17 07:13:19.046 [main] DEBUG nextflow.cache.CacheFactory - Using Nextflow cache factory: nextflow.cache.DefaultCacheFactory
+Nov-17 07:13:19.075 [main] DEBUG nextflow.util.CustomThreadPool - Creating default thread pool > poolSize: 3; maxThreads: 1000
+Nov-17 07:13:19.250 [main] DEBUG nextflow.Session - Work-dir: /workspaces/ngs-variant-calling/ngs-variant-calling/results_nf/nextflow/work [ext2/ext3]
+Nov-17 07:13:19.250 [main] DEBUG nextflow.Session - Script base path does not exist or is not a directory: /workspaces/ngs-variant-calling/ngs-variant-calling/workflow/bin
+Nov-17 07:13:19.302 [main] DEBUG nextflow.executor.ExecutorFactory - Extension executors providers=[K8sExecutor]
+Nov-17 07:13:19.331 [main] DEBUG nextflow.Session - Observer factory (v2): LinObserverFactory
+Nov-17 07:13:19.335 [main] DEBUG nextflow.Session - Observer factory (v2): DefaultObserverFactory
+Nov-17 07:13:19.442 [main] DEBUG nextflow.Session - Session start
+Nov-17 07:13:19.450 [main] DEBUG nextflow.trace.TraceFileObserver - Workflow started -- trace file: /workspaces/ngs-variant-calling/ngs-variant-calling/results_nf/pipeline_info/trace.tsv
+Nov-17 07:13:19.471 [main] DEBUG nextflow.script.ScriptLoaderFactory - Using script parser v2
+Nov-17 07:13:20.995 [main] DEBUG nextflow.script.ScriptRunner - > Launching execution
+Nov-17 07:13:21.383 [main] INFO  nextflow.Nextflow - NGS variant calling (Nextflow) · 1 sample(s) + 0 control(s) · reference NC_002549.1 · filters QUAL>=30 DP>=15 AF>=0.8 · host removal off · screen on · Kraken2 off · out /workspaces/ngs-variant-calling/ngs-variant-calling/results_nf
+Nov-17 07:13:21.973 [main] WARN  nextflow.Nextflow - Reference NC_002549.1 has no entry in SNPEFF_DB – annotation will be skipped.
+Nov-17 07:13:22.036 [main] DEBUG n.script.dsl.ProcessConfigBuilder - Config settings `withName:DOWNLOAD_READS|DOWNLOAD_REFERENCE` matches process DOWNLOAD_REFERENCE
+Nov-17 07:13:22.045 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: local
+Nov-17 07:13:22.046 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Nov-17 07:13:22.093 [main] DEBUG nextflow.executor.Executor - [warm up] executor > local
+Nov-17 07:13:22.121 [main] DEBUG n.processor.LocalPollingMonitor - Creating local task monitor for executor 'local' > cpus=2; memory=7.8 GB; capacity=2; pollInterval=100ms; dumpInterval=5m
+Nov-17 07:13:22.144 [main] DEBUG n.processor.TaskPollingMonitor - >>> barrier register (monitor: local)
+Nov-17 07:13:22.241 [main] DEBUG nextflow.processor.TaskProcessor - Creating process 'DOWNLOAD_REFERENCE': maxForks=0; fair=false; array=0
+Nov-17 07:13:22.345 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: local
+Nov-17 07:13:22.345 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Nov-17 07:13:22.346 [main] DEBUG nextflow.processor.TaskProcessor - Creating process 'INDEX_REFERENCE': maxForks=0; fair=false; array=0
+Nov-17 07:13:22.406 [main] DEBUG n.script.dsl.ProcessConfigBuilder - Config settings `withName:DOWNLOAD_READS|DOWNLOAD_REFERENCE` matches process DOWNLOAD_READS
+Nov-17 07:13:22.408 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: local
+Nov-17 07:13:22.408 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Nov-17 07:13:22.409 [main] DEBUG nextflow.processor.TaskProcessor - Creating process 'DOWNLOAD_READS': maxForks=0; fair=false; array=0
+Nov-17 07:13:22.422 [main] DEBUG n.script.dsl.ProcessConfigBuilder - Config settings `withName:FASTP|ALIGN|HOST_REMOVAL|SCREEN|CLASSIFY` matches process FASTP
+Nov-17 07:13:22.424 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: local
+Nov-17 07:13:22.424 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Nov-17 07:13:22.425 [main] DEBUG nextflow.processor.TaskProcessor - Creating process 'FASTP': maxForks=0; fair=false; array=0
+Nov-17 07:13:22.440 [main] DEBUG n.script.dsl.ProcessConfigBuilder - Config settings `withName:FASTP|ALIGN|HOST_REMOVAL|SCREEN|CLASSIFY` matches process SCREEN
+Nov-17 07:13:22.441 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: local
+Nov-17 07:13:22.441 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Nov-17 07:13:22.442 [main] DEBUG nextflow.processor.TaskProcessor - Creating process 'SCREEN': maxForks=0; fair=false; array=0
+Nov-17 07:13:22.456 [main] DEBUG n.script.dsl.ProcessConfigBuilder - Config settings `withName:FASTP|ALIGN|HOST_REMOVAL|SCREEN|CLASSIFY` matches process ALIGN
+Nov-17 07:13:22.457 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: local
+Nov-17 07:13:22.458 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Nov-17 07:13:22.458 [main] DEBUG nextflow.processor.TaskProcessor - Creating process 'ALIGN': maxForks=0; fair=false; array=0
+Nov-17 07:13:22.466 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: local
+Nov-17 07:13:22.466 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Nov-17 07:13:22.466 [main] DEBUG nextflow.processor.TaskProcessor - Creating process 'CALL_VARIANTS': maxForks=0; fair=false; array=0
+Nov-17 07:13:22.485 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: local
+Nov-17 07:13:22.487 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Nov-17 07:13:22.488 [main] DEBUG nextflow.processor.TaskProcessor - Creating process 'REPORT': maxForks=0; fair=false; array=0
+Nov-17 07:13:22.495 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: local
+Nov-17 07:13:22.496 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Nov-17 07:13:22.496 [main] DEBUG nextflow.processor.TaskProcessor - Creating process 'R_STATS': maxForks=0; fair=false; array=0
+Nov-17 07:13:22.553 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: local
+Nov-17 07:13:22.553 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Nov-17 07:13:22.554 [main] DEBUG nextflow.processor.TaskProcessor - Creating process 'DASHBOARD': maxForks=0; fair=false; array=0
+Nov-17 07:13:22.564 [main] DEBUG nextflow.Session - Process names: DOWNLOAD_READS, ANNOTATE, R_STATS, CALL_VARIANTS, HOST_REMOVAL, REPORT, FASTP, CLASSIFY, ALIGN, SCREEN, DASHBOARD, DOWNLOAD_REFERENCE, INDEX_REFERENCE
+Nov-17 07:13:22.570 [main] DEBUG nextflow.Session - Igniting dataflow network (13)
+Nov-17 07:13:22.571 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > DOWNLOAD_REFERENCE
+Nov-17 07:13:22.573 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > INDEX_REFERENCE
+Nov-17 07:13:22.575 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > DOWNLOAD_READS
+Nov-17 07:13:22.577 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > FASTP
+Nov-17 07:13:22.580 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > SCREEN
+Nov-17 07:13:22.580 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > ALIGN
+Nov-17 07:13:22.580 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > CALL_VARIANTS
+Nov-17 07:13:22.580 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > REPORT
+Nov-17 07:13:22.581 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > R_STATS
+Nov-17 07:13:22.581 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > DASHBOARD
+Nov-17 07:13:22.584 [main] DEBUG nextflow.script.ScriptRunner - Parsed script files:
+  Main: /workspaces/ngs-variant-calling/ngs-variant-calling/workflow/main.nf
+Nov-17 07:13:22.586 [main] DEBUG nextflow.script.ScriptRunner - > Awaiting termination 
+Nov-17 07:13:22.586 [main] DEBUG nextflow.Session - Session await
+Nov-17 07:13:22.847 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Nov-17 07:13:22.852 [Task submitter] INFO  nextflow.Session - [57/121f16] Submitted process > DOWNLOAD_REFERENCE (NC_002549.1)
+Nov-17 07:13:22.902 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Nov-17 07:13:22.904 [Task submitter] INFO  nextflow.Session - [b7/78170d] Submitted process > DOWNLOAD_READS (SRR1553607)
+Nov-17 07:13:24.377 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 1; name: DOWNLOAD_REFERENCE (NC_002549.1); status: COMPLETED; exit: 0; error: -; workDir: /workspaces/ngs-variant-calling/ngs-variant-calling/results_nf/nextflow/work/57/121f16b16f2179bf85f823ba147be1]
+Nov-17 07:13:24.379 [Task monitor] DEBUG nextflow.util.ThreadPoolBuilder - Creating thread pool 'TaskFinalizer' minSize=10; maxSize=10; workQueue=LinkedBlockingQueue[-1]; allowCoreThreadTimeout=false
+Nov-17 07:13:24.417 [TaskFinalizer-1] DEBUG nextflow.util.ThreadPoolBuilder - Creating thread pool 'PublishDir' minSize=10; maxSize=10; workQueue=LinkedBlockingQueue[-1]; allowCoreThreadTimeout=false
+Nov-17 07:13:24.490 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Nov-17 07:13:24.491 [Task submitter] INFO  nextflow.Session - [fa/3ab737] Submitted process > INDEX_REFERENCE (NC_002549.1)
+Nov-17 07:13:25.789 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 3; name: INDEX_REFERENCE (NC_002549.1); status: COMPLETED; exit: 0; error: -; workDir: /workspaces/ngs-variant-calling/ngs-variant-calling/results_nf/nextflow/work/fa/3ab7378a4ccfd65d132ad2d949aa08]
+Nov-17 07:14:03.121 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 2; name: DOWNLOAD_READS (SRR1553607); status: COMPLETED; exit: 0; error: -; workDir: /workspaces/ngs-variant-calling/ngs-variant-calling/results_nf/nextflow/work/b7/78170d40bca0d248a2abb86d991789]
+Nov-17 07:14:03.319 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Nov-17 07:14:03.320 [Task submitter] INFO  nextflow.Session - [87/825308] Submitted process > FASTP (SRR1553607)
+Nov-17 07:14:14.466 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 4; name: FASTP (SRR1553607); status: COMPLETED; exit: 0; error: -; workDir: /workspaces/ngs-variant-calling/ngs-variant-calling/results_nf/nextflow/work/87/825308427e1f03412d94245d8390b7]
+Nov-17 07:14:14.554 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Nov-17 07:14:14.554 [Task submitter] INFO  nextflow.Session - [49/c95fbd] Submitted process > SCREEN (SRR1553607)
+Nov-17 07:14:17.941 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 5; name: SCREEN (SRR1553607); status: COMPLETED; exit: 0; error: -; workDir: /workspaces/ngs-variant-calling/ngs-variant-calling/results_nf/nextflow/work/49/c95fbd082379a18a2b732e84151d07]
+Nov-17 07:14:17.967 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Nov-17 07:14:17.971 [Task submitter] INFO  nextflow.Session - [b4/01d5b9] Submitted process > ALIGN (SRR1553607)
+Nov-17 07:14:30.824 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 6; name: ALIGN (SRR1553607); status: COMPLETED; exit: 0; error: -; workDir: /workspaces/ngs-variant-calling/ngs-variant-calling/results_nf/nextflow/work/b4/01d5b91644cc765f9497f16e95bafa]
+Nov-17 07:14:30.880 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Nov-17 07:14:30.881 [Task submitter] INFO  nextflow.Session - [68/0b52e7] Submitted process > CALL_VARIANTS (SRR1553607)
+Nov-17 07:14:31.957 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 7; name: CALL_VARIANTS (SRR1553607); status: COMPLETED; exit: 0; error: -; workDir: /workspaces/ngs-variant-calling/ngs-variant-calling/results_nf/nextflow/work/68/0b52e768ab6920c3b7eff8d5dcb27f]
+Nov-17 07:14:31.995 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Nov-17 07:14:31.995 [Task submitter] INFO  nextflow.Session - [b5/e6914b] Submitted process > REPORT (SRR1553607)
+Nov-17 07:14:32.623 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 8; name: REPORT (SRR1553607); status: COMPLETED; exit: 0; error: -; workDir: /workspaces/ngs-variant-calling/ngs-variant-calling/results_nf/nextflow/work/b5/e6914be15d2d983d3275e01f50b00b]
+Nov-17 07:14:32.657 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Nov-17 07:14:32.658 [Task submitter] INFO  nextflow.Session - [84/d0c1d8] Submitted process > R_STATS (SRR1553607)
+Nov-17 07:14:33.594 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 9; name: R_STATS (SRR1553607); status: COMPLETED; exit: 0; error: -; workDir: /workspaces/ngs-variant-calling/ngs-variant-calling/results_nf/nextflow/work/84/d0c1d84c01b68922a5825c9868c74a]
+Nov-17 07:14:33.641 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Nov-17 07:14:33.642 [Task submitter] INFO  nextflow.Session - [fd/b405c2] Submitted process > DASHBOARD
+Nov-17 07:14:34.932 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 10; name: DASHBOARD; status: COMPLETED; exit: 0; error: -; workDir: /workspaces/ngs-variant-calling/ngs-variant-calling/results_nf/nextflow/work/fd/b405c2604a3350514f0a5773050d9b]
+Nov-17 07:14:34.955 [main] DEBUG nextflow.Session - Session await > all processes finished
+Nov-17 07:14:35.031 [Task monitor] DEBUG n.processor.TaskPollingMonitor - <<< barrier arrives (monitor: local) - terminating tasks monitor poll loop
+Nov-17 07:14:35.032 [main] DEBUG nextflow.Session - Session await > all barriers passed
+Nov-17 07:14:35.037 [main] DEBUG nextflow.util.ThreadPoolManager - Thread pool 'TaskFinalizer' shutdown completed (hard=false)
+Nov-17 07:14:35.038 [main] DEBUG nextflow.util.ThreadPoolManager - Thread pool 'PublishDir' shutdown completed (hard=false)
+Nov-17 07:14:35.048 [main] DEBUG n.trace.WorkflowStatsObserver - Workflow completed > WorkflowStats[succeededCount=10; failedCount=0; ignoredCount=0; cachedCount=0; pendingCount=0; submittedCount=0; runningCount=0; retriesCount=0; abortedCount=0; succeedDuration=1m 40s; failedDuration=0ms; cachedDuration=0ms;loadCpus=0; loadMemory=0; peakRunning=2; peakCpus=2; peakMemory=0; ]
+Nov-17 07:14:35.156 [main] DEBUG nextflow.trace.ReportObserver - Workflow completed -- rendering execution report
+Nov-17 07:14:36.805 [main] DEBUG nextflow.trace.TimelineObserver - Workflow completed -- rendering execution timeline
+Nov-17 07:14:36.986 [main] DEBUG nextflow.trace.TraceFileObserver - Workflow completed -- saving trace file
+Nov-17 07:14:36.997 [main] DEBUG nextflow.cache.CacheDB - Closing CacheDB done
+Nov-17 07:14:37.013 [main] DEBUG nextflow.util.ThreadPoolManager - Thread pool 'FileTransfer' shutdown completed (hard=false)
+Nov-17 07:14:37.013 [main] DEBUG nextflow.script.ScriptRunner - > Execution complete -- Goodbye

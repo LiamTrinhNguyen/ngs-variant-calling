@@ -1,0 +1,1 @@
+2026-11-17 07:14:03 | INFO     | CMD: fastp -i SRR1553607_1.fastq.gz -o SRR1553607_R1.trimmed.fastq.gz -h SRR1553607.fastp.html -j SRR1553607.fastp.json --correction --thread 2 --qualified_quality_phred 20 --length_required 30 -I SRR1553607_2.fastq.gz -O SRR1553607_R2.trimmed.fastq.gz --detect_adapter_for_pe

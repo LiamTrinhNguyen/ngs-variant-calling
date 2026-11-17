@@ -38,7 +38,10 @@ are off (SRR1553607: 559 calls, 151 PASS – also with host removal on):
     dashboard flags findings below 10× the controls' reads per million.
   - REF_SETS: multi-sequence references. Influenza A is now all 8 segments
     (Influenza_A_PR8); NC_002016.1 alone was segment 7 only.
-  - sample_reads() retries a dropped ENA stream.
+  - sample_reads() retries a dropped ENA stream, and download_file() makes
+    every FASTQ download resumable (HTTP Range, 5 attempts with back-off) and
+    checks it against ENA's size and MD5; a verified file is reused. Snakemake
+    (retries: 2) and Nextflow (errorStrategy 'retry') re-run failed downloads.
 
 Changes in v2.7 (from v2.6). Interactive prompts only; the step functions and
 their outputs are unchanged, so results match v2.6 (SRR1553607: 559 calls,
@@ -252,6 +255,71 @@ def download_ncbi_fasta(accession_id: str, output_path: Path) -> Path:
     log.info(f"Saved {output_path}")
     return output_path
 
+DOWNLOAD_TRIES = 5   # attempts per file (each resumes where the last one stopped)
+
+
+def _md5(path: Path) -> str:
+    import hashlib
+    h = hashlib.md5()
+    with open(path, "rb") as fh:
+        for block in iter(lambda: fh.read(1 << 20), b""):
+            h.update(block)
+    return h.hexdigest()
+
+
+def download_file(url: str, dest: Path, size: Optional[int] = None, md5: Optional[str] = None,
+                  tries: int = DOWNLOAD_TRIES) -> Path:
+    """Download url to dest, RESUMING after a dropped connection and checking
+    the size and MD5 that ENA publishes.
+    WHY: ENA often closes long downloads mid-file ("Remote end closed connection",
+         IncompleteRead). Starting again from zero can fail the same way for a
+         big file; an HTTP Range request continues from the last byte received.
+         A file that is already complete and correct is reused (fast re-runs)."""
+    import time
+    if dest.exists() and size and dest.stat().st_size == size and (not md5 or _md5(dest) == md5):
+        log.info(f"{dest.name} already downloaded and verified")
+        return dest
+    last = None
+    for attempt in range(1, tries + 1):
+        have = dest.stat().st_size if dest.exists() else 0
+        if size and have > size:                 # junk from an older, different file
+            dest.unlink()
+            have = 0
+        try:
+            if not (size and have == size):
+                headers = {"Range": f"bytes={have}-"} if have else {}
+                # timeout = (connect, between-bytes): a stalled stream fails instead of hanging
+                with requests.get(url, stream=True, timeout=(30, 120), headers=headers) as r:
+                    if have and r.status_code != 206:    # server ignored the range: start over
+                        have = 0
+                    r.raise_for_status()
+                    total = size or (have + int(r.headers.get("content-length", 0)))
+                    with open(dest, "ab" if have else "wb") as f, tqdm(
+                        total=total, initial=have, unit="B", unit_scale=True, desc=dest.name, ncols=80
+                    ) as bar:
+                        for chunk in r.iter_content(chunk_size=1 << 20):
+                            if chunk:
+                                f.write(chunk)
+                                bar.update(len(chunk))
+            got = dest.stat().st_size
+            if size and got != size:
+                raise IOError(f"got {got:,} of {size:,} bytes")
+            if md5 and _md5(dest) != md5:
+                dest.unlink()                    # corrupt: the next attempt starts from zero
+                raise IOError("MD5 checksum mismatch")
+            return dest
+        except Exception as e:                   # requests/urllib3 errors, short or corrupt file
+            last = e
+            if attempt < tries:
+                wait = min(60, 5 * 2 ** (attempt - 1))
+                log.warning(f"Download of {dest.name} interrupted ({type(e).__name__}: {str(e)[:80]}); "
+                            f"resuming in {wait}s (attempt {attempt + 1}/{tries})")
+                time.sleep(wait)
+    raise RuntimeError(f"Could not download {dest.name} after {tries} attempts "
+                       f"({type(last).__name__}). ENA may be busy – run again later; "
+                       f"the partial file is kept and the next run resumes it.")
+
+
 def get_sra_metadata_and_fastq(run_accession: str, out_dir: Path) -> Tuple[str, List[Path]]:
     """Fetch ENA metadata + download FASTQ via HTTPS. Returns (organism, [fastq paths])."""
     if requests is None:
@@ -266,10 +334,22 @@ def get_sra_metadata_and_fastq(run_accession: str, out_dir: Path) -> Tuple[str, 
         f"accession={run_accession}&result=read_run&"
         "fields=study_accession,sample_accession,experiment_accession,"
         "scientific_name,instrument_platform,instrument_model,"
-        "library_layout,library_strategy,read_count,base_count,fastq_ftp"
+        "library_layout,library_strategy,read_count,base_count,fastq_ftp,fastq_bytes,fastq_md5"
     )
     log.info(f"Querying ENA for {run_accession}")
-    resp = requests.get(url, timeout=90)
+    import time
+    for attempt in range(1, DOWNLOAD_TRIES + 1):
+        try:
+            resp = requests.get(url, timeout=90)
+            if resp.status_code < 500:
+                break
+            err = f"HTTP {resp.status_code}"
+        except requests.RequestException as e:
+            err = type(e).__name__
+        if attempt == DOWNLOAD_TRIES:
+            raise RuntimeError(f"ENA API failed after {DOWNLOAD_TRIES} attempts ({err})")
+        log.warning(f"ENA query failed ({err}); retrying in {5 * attempt}s")
+        time.sleep(5 * attempt)
     if resp.status_code != 200:
         raise RuntimeError(f"ENA API failed: HTTP {resp.status_code}")
 
@@ -302,26 +382,21 @@ def get_sra_metadata_and_fastq(run_accession: str, out_dir: Path) -> Tuple[str, 
     print("=" * 60 + "\n")
 
     fastq_paths = []
-    for link in data.get("fastq_ftp", "").split(";"):
+    links = data.get("fastq_ftp", "").split(";")
+    sizes = data.get("fastq_bytes", "").split(";")
+    md5s = data.get("fastq_md5", "").split(";")
+    for i, link in enumerate(links):
         if not link.strip():
             continue
         clean = link.replace("ftp://", "").strip()
         file_url = f"https://{clean}"
         fname = out_dir / Path(file_url).name
-        log.info(f"Downloading {fname.name} …")
-
-        with requests.get(file_url, stream=True, timeout=600) as r:
-            r.raise_for_status()
-            total = int(r.headers.get("content-length", 0))
-            with open(fname, "wb") as f, tqdm(
-                total=total, unit="B", unit_scale=True, desc=fname.name, ncols=80
-            ) as bar:
-                for chunk in r.iter_content(chunk_size=1 << 20):
-                    if chunk:
-                        f.write(chunk)
-                        bar.update(len(chunk))
+        size = int(sizes[i]) if i < len(sizes) and sizes[i].isdigit() else None
+        md5 = md5s[i].strip() if i < len(md5s) and md5s[i].strip() else None
+        log.info(f"Downloading {fname.name}" + (f" ({size / 1e6:.1f} MB)" if size else "") + " …")
+        download_file(file_url, fname, size=size, md5=md5)
         fastq_paths.append(fname)
-        log.info(f"Saved {fname}")
+        log.info(f"Saved {fname}" + (" (size and MD5 verified)" if md5 else ""))
 
     if not fastq_paths:
         raise RuntimeError(f"No FASTQ files found for {run_accession}")

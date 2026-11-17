@@ -1,0 +1,155 @@
+Assuming unrestricted shared filesystem usage.
+
+SNAKEMAKE
+=========
+  Date: 2026-11-17 07:11:39
+  Workflow ID: 7b3acf64-ba27-42f6-843d-e0ffe21cdbb1
+  Platform: Linux-6.8.0-1070-azure-x86_64-with-glibc2.39
+  Host: codespaces-dfd2f7
+  User: codespace
+  Snakemake version: 9.27.1
+  Python version: 3.11.18 (main, Oct 26 2026, 11:35:17) [GCC 15.3.0]
+  Command: /home/codespace/miniforge3/envs/ngs-env/bin/snakemake -s workflow/Snakefile -c 4
+  Snakefile: /workspaces/ngs-variant-calling/ngs-variant-calling/workflow/Snakefile
+  Base directory: /workspaces/ngs-variant-calling/ngs-variant-calling/workflow
+  Run directory: /workspaces/ngs-variant-calling/ngs-variant-calling
+  Working directory: /workspaces/ngs-variant-calling/ngs-variant-calling
+  Config file(s): []
+  Config MD5: 4381db0e4d407e4d64529dd1375be93e
+
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided cores: 4
+Rules claiming more threads will be scaled down.
+Job stats:
+job               count
+--------------  -------
+download_reads        1
+fastp                 1
+align                 1
+screen                1
+call_variants         1
+report                1
+r_stats               1
+dashboard             1
+all                   1
+total                 9
+
+Select jobs to execute...
+Execute 1 jobs...
+[Tue Nov 17 07:11:40 2026]
+localrule download_reads:
+    output: results/00_raw/SRR1553607_1.fastq.gz, results/00_raw/SRR1553607_2.fastq.gz
+    jobid: 7
+    reason: Code has changed since last execution
+    wildcards: sample=SRR1553607
+    resources: tmpdir=/tmp
+[Tue Nov 17 07:12:30 2026]
+Finished jobid: 7 (Rule: download_reads)
+1 of 9 steps (11%) done
+Select jobs to execute...
+Execute 1 jobs...
+[Tue Nov 17 07:12:30 2026]
+localrule fastp:
+    input: results/00_raw/SRR1553607_1.fastq.gz, results/00_raw/SRR1553607_2.fastq.gz
+    output: results/02_qc/SRR1553607_R1.trimmed.fastq.gz, results/02_qc/SRR1553607_R2.trimmed.fastq.gz, results/02_qc/SRR1553607.fastp.html, results/02_qc/SRR1553607.fastp.json
+    jobid: 6
+    reason: Input files updated by another job: results/00_raw/SRR1553607_1.fastq.gz, results/00_raw/SRR1553607_2.fastq.gz
+    wildcards: sample=SRR1553607
+    threads: 4
+    resources: tmpdir=/tmp
+[Tue Nov 17 07:12:39 2026]
+Finished jobid: 6 (Rule: fastp)
+2 of 9 steps (22%) done
+Select jobs to execute...
+Execute 1 jobs...
+[Tue Nov 17 07:12:39 2026]
+localrule align:
+    input: results/02_qc/SRR1553607_R1.trimmed.fastq.gz, results/02_qc/SRR1553607_R2.trimmed.fastq.gz, results/01_reference/NC_002549.1.fasta, results/01_reference/NC_002549.1.fasta.amb, results/01_reference/NC_002549.1.fasta.ann, results/01_reference/NC_002549.1.fasta.bwt, results/01_reference/NC_002549.1.fasta.pac, results/01_reference/NC_002549.1.fasta.sa, results/01_reference/NC_002549.1.fasta.fai, results/01_reference/NC_002549.1.dict
+    output: results/03_aligned/SRR1553607.sorted.bam, results/03_aligned/SRR1553607.sorted.bam.bai
+    jobid: 5
+    reason: Input files updated by another job: results/02_qc/SRR1553607_R1.trimmed.fastq.gz, results/02_qc/SRR1553607_R2.trimmed.fastq.gz
+    wildcards: sample=SRR1553607
+    threads: 4
+    resources: tmpdir=/tmp
+Select jobs to execute...
+[Tue Nov 17 07:12:53 2026]
+Finished jobid: 5 (Rule: align)
+3 of 9 steps (33%) done
+Execute 1 jobs...
+[Tue Nov 17 07:12:53 2026]
+localrule screen:
+    input: results/02_qc/SRR1553607_R1.trimmed.fastq.gz, results/02_qc/SRR1553607_R2.trimmed.fastq.gz
+    output: results/02_qc/SRR1553607.reference_screen.tsv
+    jobid: 9
+    reason: Input files updated by another job: results/02_qc/SRR1553607_R1.trimmed.fastq.gz, results/02_qc/SRR1553607_R2.trimmed.fastq.gz
+    wildcards: sample=SRR1553607
+    threads: 4
+    resources: tmpdir=/tmp
+Select jobs to execute...
+[Tue Nov 17 07:12:57 2026]
+Finished jobid: 9 (Rule: screen)
+4 of 9 steps (44%) done
+Execute 1 jobs...
+[Tue Nov 17 07:12:57 2026]
+localrule call_variants:
+    input: results/01_reference/NC_002549.1.fasta, results/01_reference/NC_002549.1.fasta.amb, results/01_reference/NC_002549.1.fasta.ann, results/01_reference/NC_002549.1.fasta.bwt, results/01_reference/NC_002549.1.fasta.pac, results/01_reference/NC_002549.1.fasta.sa, results/01_reference/NC_002549.1.fasta.fai, results/01_reference/NC_002549.1.dict, results/03_aligned/SRR1553607.sorted.bam, results/03_aligned/SRR1553607.sorted.bam.bai
+    output: results/04_variants/SRR1553607.raw.vcf.gz, results/04_variants/SRR1553607.raw.vcf.gz.csi, results/04_variants/SRR1553607.calling_settings.json
+    jobid: 2
+    reason: Input files updated by another job: results/03_aligned/SRR1553607.sorted.bam.bai, results/03_aligned/SRR1553607.sorted.bam
+    wildcards: sample=SRR1553607
+    resources: tmpdir=/tmp
+[Tue Nov 17 07:12:59 2026]
+Finished jobid: 2 (Rule: call_variants)
+5 of 9 steps (56%) done
+Select jobs to execute...
+Execute 1 jobs...
+[Tue Nov 17 07:12:59 2026]
+localrule report:
+    input: results/04_variants/SRR1553607.raw.vcf.gz
+    output: results/06_reports/SRR1553607.high_confidence_variants.tsv, results/06_reports/SRR1553607.all_calls.tsv, results/06_reports/SRR1553607.flagged.vcf.gz
+    jobid: 1
+    reason: Input files updated by another job: results/04_variants/SRR1553607.raw.vcf.gz
+    wildcards: sample=SRR1553607
+    resources: tmpdir=/tmp
+[Tue Nov 17 07:13:02 2026]
+Finished jobid: 1 (Rule: report)
+6 of 9 steps (67%) done
+Select jobs to execute...
+Execute 1 jobs...
+[Tue Nov 17 07:13:02 2026]
+localrule r_stats:
+    input: results/06_reports/SRR1553607.all_calls.tsv, results/01_reference/NC_002549.1.fasta.fai
+    output: results/06_reports/SRR1553607.r_stats.tsv, results/06_reports/SRR1553607.r_windows.tsv
+    jobid: 8
+    reason: Input files updated by another job: results/06_reports/SRR1553607.all_calls.tsv
+    wildcards: sample=SRR1553607
+    resources: tmpdir=/tmp
+[Tue Nov 17 07:13:04 2026]
+Finished jobid: 8 (Rule: r_stats)
+7 of 9 steps (78%) done
+Select jobs to execute...
+Execute 1 jobs...
+[Tue Nov 17 07:13:04 2026]
+localrule dashboard:
+    input: results/06_reports/SRR1553607.high_confidence_variants.tsv, results/06_reports/SRR1553607.all_calls.tsv, results/06_reports/SRR1553607.r_stats.tsv, results/04_variants/SRR1553607.calling_settings.json, results/02_qc/SRR1553607.fastp.json, results/03_aligned/SRR1553607.sorted.bam, results/02_qc/SRR1553607.reference_screen.tsv
+    output: results/07_dashboard/dashboard.html, results/07_dashboard/sample_summary.csv, results/07_dashboard/all_samples_variants.csv, results/07_dashboard/all_samples_calls.csv, results/07_dashboard/r_statistics.csv, results/07_dashboard/variant_windows.csv, results/07_dashboard/reference_screen.csv, results/07_dashboard/taxonomy.csv
+    jobid: 10
+    reason: Input files updated by another job: results/06_reports/SRR1553607.all_calls.tsv, results/04_variants/SRR1553607.calling_settings.json, results/02_qc/SRR1553607.fastp.json, results/06_reports/SRR1553607.r_stats.tsv, results/03_aligned/SRR1553607.sorted.bam, results/06_reports/SRR1553607.high_confidence_variants.tsv, results/02_qc/SRR1553607.reference_screen.tsv
+    resources: tmpdir=/tmp
+[Tue Nov 17 07:13:06 2026]
+Finished jobid: 10 (Rule: dashboard)
+8 of 9 steps (89%) done
+Select jobs to execute...
+Execute 1 jobs...
+[Tue Nov 17 07:13:06 2026]
+localrule all:
+    input: results/06_reports/SRR1553607.high_confidence_variants.tsv, results/06_reports/SRR1553607.r_stats.tsv, results/02_qc/SRR1553607.reference_screen.tsv, results/07_dashboard/dashboard.html
+    jobid: 0
+    reason: Input files updated by another job: results/06_reports/SRR1553607.high_confidence_variants.tsv, results/07_dashboard/dashboard.html, results/06_reports/SRR1553607.r_stats.tsv, results/02_qc/SRR1553607.reference_screen.tsv
+    resources: tmpdir=/tmp
+[Tue Nov 17 07:13:06 2026]
+Finished jobid: 0 (Rule: all)
+9 of 9 steps (100%) done
+Complete log(s): /workspaces/ngs-variant-calling/ngs-variant-calling/.snakemake/log/2026-11-17T071139.670597.snakemake.log
+Elapsed time: 0:01:27.078820

@@ -53,4 +53,4 @@ JSON report: results/02_qc/SRR1553607.fastp.json
 HTML report: results/02_qc/SRR1553607.fastp.html
 
 fastp -i results/00_raw/SRR1553607_1.fastq.gz -o results/02_qc/SRR1553607_R1.trimmed.fastq.gz -h results/02_qc/SRR1553607.fastp.html -j results/02_qc/SRR1553607.fastp.json --correction --thread 4 --qualified_quality_phred 20 --length_required 30 -I results/00_raw/SRR1553607_2.fastq.gz -O results/02_qc/SRR1553607_R2.trimmed.fastq.gz --detect_adapter_for_pe 
-fastp v1.4.0, time used: 9 seconds
+fastp v1.4.0, time used: 8 seconds

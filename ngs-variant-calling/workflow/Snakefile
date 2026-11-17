@@ -145,6 +145,9 @@ rule download_reads:
     output:
         r1 = f"{OUT}/00_raw/{{sample}}_1.fastq.gz",
         r2 = f"{OUT}/00_raw/{{sample}}_2.fastq.gz",
+    # WHY retries: ENA sometimes drops the connection. download_file() already
+    #     resumes up to 5 times; this re-runs the whole job if that still fails.
+    retries: 2
     run:
         import shutil
         acc = config["samples"][wildcards.sample]["sra"]
@@ -152,9 +155,10 @@ rule download_reads:
         # WHY: ENA names files after the accession. Two samples downloading at
         #      the same time (e.g. the same SRR under two names) would otherwise
         #      write and rename each other's files.
+        # WHY not emptied first: a partial file left by an interrupted run is
+        #     resumed, not downloaded again (size + MD5 are checked at the end)
         tmp = Path(output.r1).parent / f".download_{wildcards.sample}"
-        shutil.rmtree(tmp, ignore_errors=True)
-        tmp.mkdir(parents=True)
+        tmp.mkdir(parents=True, exist_ok=True)
         _, fastqs = ngs.get_sra_metadata_and_fastq(acc, tmp)
         # WHY: every later rule expects R1 + R2
         if len(fastqs) != 2:
@@ -174,6 +178,7 @@ rule download_reads:
 rule download_reference:
     output:
         REF_FA,
+    retries: 2   # NCBI can be busy too
     run:
         ngs.download_reference("unknown", Path(output[0]).parent, force_accession=REF)
 

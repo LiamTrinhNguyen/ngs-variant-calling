@@ -1,0 +1,10 @@
+2026-11-17 07:14:32 | INFO     | Flagging calls: QUAL >= 30, DP >= 15, AF >= 0.8
+2026-11-17 07:14:32 | INFO     | CMD: bash -c bcftools filter -s LowQual -e 'QUAL<30' SRR1553607.raw.vcf.gz -Ou | bcftools filter -m + -s LowDepth -e 'FMT/DP<15' -Ou | bcftools filter -m + -s LowAF -e 'FMT/AD[0:1]/FMT/DP<0.8' -Oz -o SRR1553607.flagged.vcf.gz
+2026-11-17 07:14:32 | INFO     | CMD: bcftools index -f SRR1553607.flagged.vcf.gz
+2026-11-17 07:14:32 | INFO     | CMD: bcftools query -f %CHROM	%POS	%REF	%ALT	%QUAL	%FILTER	[%DP]	[%AD]	%INFO/ANN
+ SRR1553607.flagged.vcf.gz -o SRR1553607.tmp.tsv
+2026-11-17 07:14:32 | WARNING  | No INFO/ANN field found – treating as raw (unannotated) VCF
+2026-11-17 07:14:32 | INFO     | CMD: bcftools query -f %CHROM	%POS	%REF	%ALT	%QUAL	%FILTER	[%DP]	[%AD]
+ SRR1553607.flagged.vcf.gz -o SRR1553607.tmp.tsv
+2026-11-17 07:14:32 | INFO     | Filter QUAL >= 30 & DP >= 15 & AF >= 0.8: kept 151 / 559 calls  (flagged: LowQual 5, LowDepth 408, LowAF 0)
+2026-11-17 07:14:32 | INFO     | High-confidence report written → SRR1553607.high_confidence_variants.tsv

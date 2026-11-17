@@ -1,0 +1,5 @@
+2026-11-17 06:59:38 | INFO     | Building BWA index for NC_002549.1.fasta
+2026-11-17 06:59:38 | INFO     | CMD: bwa index NC_002549.1.fasta
+2026-11-17 06:59:38 | INFO     | Building samtools faidx
+2026-11-17 06:59:38 | INFO     | CMD: samtools faidx NC_002549.1.fasta
+2026-11-17 06:59:38 | INFO     | CMD: samtools dict NC_002549.1.fasta -o NC_002549.1.dict

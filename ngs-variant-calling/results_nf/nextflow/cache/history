@@ -1,0 +1,2 @@
+2026-11-17 06:59:31	31.6s	distracted_leavitt	ERR	8e83f15f384e123274988081196a571d	26e9d20c-12ca-4fd8-bfd6-5fa32d1398df	nextflow run /workspaces/ngs-variant-calling/ngs-variant-calling/workflow/main.nf --outdir /workspaces/ngs-variant-calling/ngs-variant-calling/results_nf
+2026-11-17 07:13:19	1m 18s	hungry_mcclintock	OK	8e83f15f384e123274988081196a571d	69803db8-ebcc-4fa8-969f-0159c51ac57a	nextflow run /workspaces/ngs-variant-calling/ngs-variant-calling/workflow/main.nf --outdir /workspaces/ngs-variant-calling/ngs-variant-calling/results_nf

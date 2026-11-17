@@ -1,0 +1,3 @@
+2026-11-17 07:14:31 | INFO     | Calling variants with bcftools mpileup | call | norm
+2026-11-17 07:14:31 | INFO     | CMD: bash -c bcftools mpileup -f NC_002549.1.fasta -q 20 -Q 20 -d 10000 -a FORMAT/AD,FORMAT/DP -Ou SRR1553607.sorted.bam | bcftools call --ploidy 1 -mv -Ou | bcftools norm -f NC_002549.1.fasta -m -any -Oz -o SRR1553607.raw.vcf.gz
+2026-11-17 07:14:31 | INFO     | CMD: bcftools index -f SRR1553607.raw.vcf.gz

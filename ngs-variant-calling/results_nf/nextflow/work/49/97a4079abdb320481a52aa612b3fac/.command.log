@@ -1,0 +1,89 @@
+2026-11-17 06:59:36 | INFO     | Querying ENA for SRR1553607
+2026-11-17 06:59:37 | INFO     | Downloading SRR1553607_1.fastq.gz …
+
+============================================================
+SRA METADATA & STATISTICS FOR: SRR1553607
+============================================================
+Scientific Name    : Zaire ebolavirus
+Sequencing Platform: ILLUMINA (Illumina HiSeq 2500)
+Library Strategy   : RNA-Seq (PAIRED)
+Total Reads        : 203,445
+Total Bases        : 41,095,890
+============================================================
+
+SRR1553607_1.fastq.gz:   0%|                        | 0.00/15.7M [00:00<?, ?B/s]SRR1553607_1.fastq.gz:   7%|█               | 1.05M/15.7M [00:01<00:19, 767kB/s]SRR1553607_1.fastq.gz:  13%|██▏             | 2.10M/15.7M [00:02<00:14, 913kB/s]SRR1553607_1.fastq.gz:  20%|███▏            | 3.15M/15.7M [00:03<00:12, 971kB/s]SRR1553607_1.fastq.gz:  27%|████           | 4.19M/15.7M [00:04<00:11, 1.00MB/s]SRR1553607_1.fastq.gz:  33%|█████          | 5.24M/15.7M [00:05<00:10, 1.02MB/s]SRR1553607_1.fastq.gz:  40%|██████         | 6.29M/15.7M [00:06<00:09, 1.03MB/s]SRR1553607_1.fastq.gz:  47%|███████        | 7.34M/15.7M [00:07<00:08, 1.04MB/s]SRR1553607_1.fastq.gz:  53%|████████       | 8.39M/15.7M [00:08<00:07, 1.04MB/s]SRR1553607_1.fastq.gz:  60%|█████████      | 9.44M/15.7M [00:09<00:06, 1.04MB/s]SRR1553607_1.fastq.gz:  67%|██████████     | 10.5M/15.7M [00:10<00:04, 1.05MB/s]SRR1553607_1.fastq.gz:  73%|███████████    | 11.5M/15.7M [00:11<00:03, 1.05MB/s]SRR1553607_1.fastq.gz:  80%|████████████   | 12.6M/15.7M [00:12<00:02, 1.05MB/s]SRR1553607_1.fastq.gz:  87%|█████████████  | 13.6M/15.7M [00:13<00:01, 1.05MB/s]SRR1553607_1.fastq.gz:  93%|██████████████ | 14.7M/15.7M [00:14<00:00, 1.05MB/s]SRR1553607_1.fastq.gz: 100%|███████████████| 15.7M/15.7M [00:15<00:00, 1.09MB/s]SRR1553607_1.fastq.gz: 100%|███████████████| 15.7M/15.7M [00:15<00:00, 1.03MB/s]
+2026-11-17 06:59:59 | INFO     | Saved download/SRR1553607_1.fastq.gz
+2026-11-17 06:59:59 | INFO     | Downloading SRR1553607_2.fastq.gz …
+Traceback (most recent call last):
+  File "/home/codespace/miniforge3/envs/ngs-env/lib/python3.11/site-packages/urllib3/connectionpool.py", line 793, in urlopen
+    response = self._make_request(
+               ^^^^^^^^^^^^^^^^^^^
+  File "/home/codespace/miniforge3/envs/ngs-env/lib/python3.11/site-packages/urllib3/connectionpool.py", line 540, in _make_request
+    response = conn.getresponse()
+               ^^^^^^^^^^^^^^^^^^
+  File "/home/codespace/miniforge3/envs/ngs-env/lib/python3.11/site-packages/urllib3/connection.py", line 638, in getresponse
+    httplib_response = super().getresponse()
+                       ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/codespace/miniforge3/envs/ngs-env/lib/python3.11/http/client.py", line 1443, in getresponse
+    response.begin()
+  File "/home/codespace/miniforge3/envs/ngs-env/lib/python3.11/http/client.py", line 337, in begin
+    version, status, reason = self._read_status()
+                              ^^^^^^^^^^^^^^^^^^^
+  File "/home/codespace/miniforge3/envs/ngs-env/lib/python3.11/http/client.py", line 306, in _read_status
+    raise RemoteDisconnected("Remote end closed connection without"
+http.client.RemoteDisconnected: Remote end closed connection without response
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/codespace/miniforge3/envs/ngs-env/lib/python3.11/site-packages/requests/adapters.py", line 696, in send
+    resp = conn.urlopen(
+           ^^^^^^^^^^^^^
+  File "/home/codespace/miniforge3/envs/ngs-env/lib/python3.11/site-packages/urllib3/connectionpool.py", line 847, in urlopen
+    retries = retries.increment(
+              ^^^^^^^^^^^^^^^^^^
+  File "/home/codespace/miniforge3/envs/ngs-env/lib/python3.11/site-packages/urllib3/util/retry.py", line 510, in increment
+    raise reraise(type(error), error, _stacktrace)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/codespace/miniforge3/envs/ngs-env/lib/python3.11/site-packages/urllib3/util/util.py", line 38, in reraise
+    raise value.with_traceback(tb)
+  File "/home/codespace/miniforge3/envs/ngs-env/lib/python3.11/site-packages/urllib3/connectionpool.py", line 793, in urlopen
+    response = self._make_request(
+               ^^^^^^^^^^^^^^^^^^^
+  File "/home/codespace/miniforge3/envs/ngs-env/lib/python3.11/site-packages/urllib3/connectionpool.py", line 540, in _make_request
+    response = conn.getresponse()
+               ^^^^^^^^^^^^^^^^^^
+  File "/home/codespace/miniforge3/envs/ngs-env/lib/python3.11/site-packages/urllib3/connection.py", line 638, in getresponse
+    httplib_response = super().getresponse()
+                       ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/codespace/miniforge3/envs/ngs-env/lib/python3.11/http/client.py", line 1443, in getresponse
+    response.begin()
+  File "/home/codespace/miniforge3/envs/ngs-env/lib/python3.11/http/client.py", line 337, in begin
+    version, status, reason = self._read_status()
+                              ^^^^^^^^^^^^^^^^^^^
+  File "/home/codespace/miniforge3/envs/ngs-env/lib/python3.11/http/client.py", line 306, in _read_status
+    raise RemoteDisconnected("Remote end closed connection without"
+urllib3.exceptions.ProtocolError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "<stdin>", line 6, in <module>
+  File "/workspaces/ngs-variant-calling/ngs-variant-calling/run_interactive_pipeline.py", line 313, in get_sra_metadata_and_fastq
+    with requests.get(file_url, stream=True, timeout=600) as r:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/codespace/miniforge3/envs/ngs-env/lib/python3.11/site-packages/requests/api.py", line 87, in get
+    return request("get", url, params=params, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/codespace/miniforge3/envs/ngs-env/lib/python3.11/site-packages/requests/api.py", line 71, in request
+    return session.request(method=method, url=url, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/codespace/miniforge3/envs/ngs-env/lib/python3.11/site-packages/requests/sessions.py", line 651, in request
+    resp = self.send(prep, **send_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/codespace/miniforge3/envs/ngs-env/lib/python3.11/site-packages/requests/sessions.py", line 784, in send
+    r = adapter.send(request, **kwargs)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/codespace/miniforge3/envs/ngs-env/lib/python3.11/site-packages/requests/adapters.py", line 711, in send
+    raise ConnectionError(err, request=request)
+requests.exceptions.ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))

@@ -1,0 +1,14 @@
+Organism	Reference	Kind	Reads	Shared_reads	Distant_reads	Spread	Evenness	Distant_spread	Distant_evenness	Mean_identity	Reads_per_million	Sampled_reads	Status
+Zaire ebolavirus	NC_002549.1	target	44	0.0	4	35	0.98	4	1.02	97.54	880.0	50000	detected
+Mycobacterium tuberculosis	NC_000962.3	target	83	0.6	230	2	0.04	18	0.2	96.68	1671.4	50000	piled up
+Salmonella enterica	NC_003198.1	target	3	0.0	47	1	1.01	4	1.02	96.76	60.0	50000	piled up
+Escherichia coli	NC_000913.3	target	3	0.0	44	1	1.01	2	1.01	98.35	60.0	50000	piled up
+Staphylococcus aureus	NC_007795.1	target	63	0.4	59	1	1.01	1	1.01	98.12	1268.6	50000	piled up
+Human (rRNA + mitochondria)	host	host	3	0.0	3	3	1.02	2	0.68	98.4	60.0	50000	host
+Sudan ebolavirus	NC_006432.1	target	0	0.0	0	0	0.0	0	0.0		0.0	50000	–
+Bundibugyo ebolavirus	NC_014373.1	target	0	0.0	0	0	0.0	0	0.0		0.0	50000	–
+Tai Forest ebolavirus	NC_014372.1	target	0	0.0	0	0	0.0	0	0.0		0.0	50000	–
+Reston ebolavirus	NC_004161.1	target	0	0.0	0	0	0.0	0	0.0		0.0	50000	–
+Marburg marburgvirus	NC_001608.3	target	0	0.0	0	0	0.0	0	0.0		0.0	50000	–
+SARS-CoV-2	NC_045512.2	target	0	0.0	0	0	0.0	0	0.0		0.0	50000	–
+Influenza A virus	Influenza_A_PR8	target	0	0.0	0	0	0.0	0	0.0		0.0	50000	–

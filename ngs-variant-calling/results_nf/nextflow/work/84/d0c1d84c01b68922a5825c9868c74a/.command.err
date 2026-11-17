@@ -1,0 +1,2 @@
+2026-11-17 07:14:33 | INFO     | Running R statistics (ngs-r)
+2026-11-17 07:14:33 | INFO     | CMD: /home/codespace/miniforge3/envs/ngs-r/bin/Rscript /workspaces/ngs-variant-calling/ngs-variant-calling/R/variant_stats.R SRR1553607.all_calls.tsv NC_002549.1.fasta.fai . SRR1553607 1000
